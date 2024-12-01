@@ -511,8 +511,8 @@ function formatDaysRemaining($days, $is_active) {
     <div class="container">
         <h1>Subscription Management</h1>
         <div style="text-align: right;">
-            <button type="button" onclick="openBackupModal()" style="background-color: #2196F3; margin-right: 10px;">Backup & Restore</button>
             <button type="button" onclick="window.location.href='backup_settings.php'" style="background-color: #9C27B0; margin-right: 10px;">Auto Backup Settings</button>
+            <button type="button" onclick="openBackupModal()" style="background-color: #2196F3; margin-right: 10px;">Backup & Restore</button>
             <form method="POST" action="logout.php" style="display: inline;">
                 <button type="submit" style="background-color: #f44336;">Logout</button>
             </form>
