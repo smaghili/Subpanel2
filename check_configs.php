@@ -1,8 +1,7 @@
 <?php
-// تنظیمات اولیه
-+ ob_start();  // فعال کردن output buffering
-+ ini_set('max_execution_time', 300);  // افزایش زمان اجرا به 5 دقیقه
-+ set_time_limit(300);
+// افزایش timeout
+set_time_limit(300);
+ini_set('max_execution_time', '300');
 
 session_start();
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
@@ -16,7 +15,6 @@ try {
     die('Database Error: ' . $e->getMessage());
 }
 
-// تابع اجرای تست کانفیگ‌ها
 function checkConfigs($url) {
     $output = [];
     $return_var = 0;
@@ -25,15 +23,6 @@ function checkConfigs($url) {
     
     // اجرای اسکریپت و انتظار برای تکمیل
     exec("python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1", $output, $return_var);
-    
-    if (empty($output)) {
-        return [
-            'total' => 0,
-            'valid' => 0,
-            'invalid' => 0,
-            'success' => false
-        ];
-    }
     
     $total = 0;
     $valid = 0;
@@ -51,8 +40,7 @@ function checkConfigs($url) {
         'total' => $total,
         'valid' => $valid,
         'invalid' => $total - $valid,
--       'success' => true
-+       'success' => ($total > 0)
+        'success' => ($return_var === 0)
     ];
 }
 
