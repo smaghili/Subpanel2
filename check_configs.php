@@ -1,4 +1,9 @@
 <?php
+// تنظیمات اولیه
++ ob_start();  // فعال کردن output buffering
++ ini_set('max_execution_time', 300);  // افزایش زمان اجرا به 5 دقیقه
++ set_time_limit(300);
+
 session_start();
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
@@ -18,25 +23,16 @@ function checkConfigs($url) {
     
     $script_path = '/var/www/scripts/v2raycheck.py';
     
-    // اجرای اسکریپت با proc_open برای خواندن خروجی در لحظه
-    $descriptorspec = array(
-        0 => array("pipe", "r"),  // stdin
-        1 => array("pipe", "w"),  // stdout
-        2 => array("pipe", "w")   // stderr
-    );
+    // اجرای اسکریپت و انتظار برای تکمیل
+    exec("python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1", $output, $return_var);
     
-    $process = proc_open("python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start", 
-                        $descriptorspec, $pipes);
-    
-    if (is_resource($process)) {
-        // خواندن خروجی در لحظه
-        while ($line = fgets($pipes[1])) {
-            $output[] = $line;
-            flush(); // ارسال خروجی به مرورگر
-        }
-        
-        fclose($pipes[1]);
-        proc_close($process);
+    if (empty($output)) {
+        return [
+            'total' => 0,
+            'valid' => 0,
+            'invalid' => 0,
+            'success' => false
+        ];
     }
     
     $total = 0;
@@ -55,7 +51,8 @@ function checkConfigs($url) {
         'total' => $total,
         'valid' => $valid,
         'invalid' => $total - $valid,
-        'success' => ($return_var === 0)
+-       'success' => true
++       'success' => ($total > 0)
     ];
 }
 
@@ -235,7 +232,9 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <div id="loading" class="loading">
             <p>Checking configs, please wait...</p>
-            <pre id="output"></pre>
+            <div class="progress">
+                <div class="progress-bar"></div>
+            </div>
         </div>
 
         <?php if ($results): ?>
@@ -290,13 +289,6 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
     <script>
         function showLoading() {
             document.getElementById('loading').style.display = 'block';
-            // اضافه کردن event source برای دریافت خروجی در لحظه
-            let output = document.getElementById('output');
-            let source = new EventSource('stream_output.php');
-            source.onmessage = function(event) {
-                output.textContent += event.data + "\n";
-                output.scrollTop = output.scrollHeight;
-            };
         }
     </script>
 </body>
