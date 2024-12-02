@@ -526,7 +526,7 @@ async def test_config(config_url: str, port: int, save_path: str, position: str 
             json.dump(config, f, indent=2)
     
         process = subprocess.Popen(
-            ["xray", "run", "-c", temp_filename],
+            ["/usr/local/bin/xray", "run", "-c", temp_filename],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )

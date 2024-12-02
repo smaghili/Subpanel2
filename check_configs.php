@@ -22,7 +22,7 @@ function checkConfigs($url) {
     $script_path = '/var/www/scripts/v2raycheck.py';
     
     // اجرای اسکریپت و نمایش خروجی در لحظه
-    $cmd = "python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1";
+    $cmd = "PATH=/usr/local/bin:$PATH python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1";
     $handle = popen($cmd, 'r');
     
     echo "<pre>";
