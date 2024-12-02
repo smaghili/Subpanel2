@@ -87,6 +87,13 @@ if [ ! -f "$DB_PATH" ]; then
         username TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS config_checks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL,
+        total_configs INTEGER,
+        valid_configs INTEGER,
+        check_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
     INSERT INTO admin (username, password) VALUES ('admin', 'admin123');
     "
 fi

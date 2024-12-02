@@ -693,6 +693,9 @@ async def test_config_batch(configs: List[str], start_port: int = 1080, batch_si
     """Test a batch of configs simultaneously and optionally sort by ping"""
     config_counter.reset()
     
+    # اضافه کردن خروجی برای check_configs.php
+    print(f"Total configs: {len(configs)}")
+    
     tasks = []
     for i, config in enumerate(configs):
         port = start_port + (i % batch_size)
@@ -705,6 +708,9 @@ async def test_config_batch(configs: List[str], start_port: int = 1080, batch_si
     
     # Filter all successful results
     successful_results = [r for r in results if r["status"] == "success"]
+    
+    # اضافه کردن خروجی برای check_configs.php
+    print(f"Valid configs: {len(successful_results)}")
     
     # Sort by ping if required
     if sort_by_ping:
@@ -896,14 +902,8 @@ async def main():
             if args.config.startswith("http"):
                 print("Fetching subscription configs...")
                 configs = fetch_subscription(args.config)
-                print(f"Found {len(configs)} configs")
             else:
                 configs = [args.config]
-        elif args.file:
-            input_file = args.file
-            print(f"Reading configs from file: {args.file}")
-            configs = read_configs_from_file(args.file)
-            print(f"Found {len(configs)} configs in file")
 
         if not configs:
             print("No valid configs found!")

@@ -5,19 +5,24 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+try {
+    $db = new SQLite3('/var/www/db/subscriptions.db');
+} catch (Exception $e) {
+    die('Database Error: ' . $e->getMessage());
+}
+
 // تابع اجرای تست کانفیگ‌ها
 function checkConfigs($url) {
     $output = [];
     $return_var = 0;
     
-    // مسیر کامل فایل v2raycheck.py در پوشه /var/www/scripts
     $script_path = '/var/www/scripts/v2raycheck.py';
+    
+    // اجرای اسکریپت و انتظار برای تکمیل
     exec("python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1", $output, $return_var);
     
-    // پردازش خروجی برای دریافت تعداد کانفیگ‌های معتبر و نامعتبر
     $total = 0;
     $valid = 0;
-    $invalid = 0;
     
     foreach ($output as $line) {
         if (strpos($line, "Total configs:") !== false) {
@@ -28,12 +33,10 @@ function checkConfigs($url) {
         }
     }
     
-    $invalid = $total - $valid;
-    
     return [
         'total' => $total,
         'valid' => $valid,
-        'invalid' => $invalid,
+        'invalid' => $total - $valid,
         'success' => ($return_var === 0)
     ];
 }
@@ -41,12 +44,34 @@ function checkConfigs($url) {
 $message = '';
 $results = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
+// بررسی درخواست تست مجدد
+if (isset($_POST['recheck']) && isset($_POST['url'])) {
+    $url = $_POST['url'];
+    $results = checkConfigs($url);
+    if ($results['success']) {
+        // ذخیره نتایج جدید در دیتابیس
+        $stmt = $db->prepare('INSERT INTO config_checks (url, total_configs, valid_configs) VALUES (:url, :total, :valid)');
+        $stmt->bindValue(':url', $url, SQLITE3_TEXT);
+        $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
+        $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
+        $stmt->execute();
+        
+        $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
+    }
+}
+// بررسی اولیه URL
+elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
-    // اجازه دادن به URL‌های خاص با کاراکترهای یونیکد
     if (filter_var($url, FILTER_VALIDATE_URL) || preg_match('/^https?:\/\/[\w\-\.\u4e00-\u9fa5]+/u', $url)) {
         $results = checkConfigs($url);
         if ($results['success']) {
+            // ذخیره نتایج در دیتابیس
+            $stmt = $db->prepare('INSERT INTO config_checks (url, total_configs, valid_configs) VALUES (:url, :total, :valid)');
+            $stmt->bindValue(':url', $url, SQLITE3_TEXT);
+            $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
+            $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
+            $stmt->execute();
+            
             $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
         } else {
             $message = '<div class="error">خطا در اجرای تست کانفیگ‌ها</div>';
@@ -55,6 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) 
         $message = '<div class="error">لطفاً یک URL معتبر وارد کنید</div>';
     }
 }
+
+// دریافت تاریخچه تست‌ها
+$history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMIT 10');
 ?>
 
 <!DOCTYPE html>
@@ -142,6 +170,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) 
             background-color: #2196F3;
             margin-right: 10px;
         }
+        .history-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        .history-table th, .history-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .recheck-btn {
+            background-color: #FF9800;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .recheck-btn:hover {
+            background-color: #F57C00;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -154,12 +208,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) 
 
         <?= $message ?>
 
-        <form method="POST">
+        <form method="POST" onsubmit="showLoading()">
             <div class="form-group">
                 <input type="url" name="subscription_url" placeholder="Enter subscription URL" required>
             </div>
             <button type="submit">Check Configs</button>
         </form>
+
+        <div id="loading" class="loading">
+            <p>Checking configs, please wait...</p>
+            <img src="loading.gif" alt="Loading...">
+        </div>
 
         <?php if ($results): ?>
         <div class="results">
@@ -179,6 +238,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) 
             </div>
         </div>
         <?php endif; ?>
+
+        <h2>Recent Checks</h2>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th>Total Configs</th>
+                    <th>Working Configs</th>
+                    <th>Check Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)): ?>
+                <tr>
+                    <td><?= htmlspecialchars($row['url']) ?></td>
+                    <td><?= $row['total_configs'] ?></td>
+                    <td><?= $row['valid_configs'] ?> / <?= $row['total_configs'] ?></td>
+                    <td><?= $row['check_date'] ?></td>
+                    <td>
+                        <form method="POST" style="display: inline;" onsubmit="showLoading()">
+                            <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
+                            <button type="submit" name="recheck" class="recheck-btn">Recheck</button>
+                        </form>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+            </tbody>
+        </table>
     </div>
+
+    <script>
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+    </script>
 </body>
 </html> 
