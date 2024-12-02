@@ -82,7 +82,8 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
         $results = checkConfigs($url);
         if ($results['success']) {
             // ذخیره نتایج در دیتابیس
-            $stmt = $db->prepare('INSERT INTO config_checks (url, total_configs, valid_configs) VALUES (:url, :total, :valid)');
+            $stmt = $db->prepare('INSERT INTO config_checks (name, url, total_configs, valid_configs) VALUES (:name, :url, :total, :valid)');
+            $stmt->bindValue(':name', $_POST['config_name'], SQLITE3_TEXT);
             $stmt->bindValue(':url', $url, SQLITE3_TEXT);
             $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
             $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
@@ -212,6 +213,13 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             text-align: center;
             margin: 20px 0;
         }
+        .history-table a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .history-table a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -226,7 +234,10 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <form method="POST" onsubmit="showLoading()">
             <div class="form-group">
-                <input type="url" name="subscription_url" placeholder="Enter subscription URL" required>
+                <input type="text" name="config_name" placeholder="Enter Config Name" required>
+            </div>
+            <div class="form-group">
+                <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required>
             </div>
             <button type="submit">Check Configs</button>
         </form>
@@ -259,7 +270,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         <table class="history-table">
             <thead>
                 <tr>
-                    <th>URL</th>
+                    <th>Name</th>
                     <th>Total Configs</th>
                     <th>Working Configs</th>
                     <th>Check Date</th>
@@ -269,7 +280,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             <tbody>
                 <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)): ?>
                 <tr>
-                    <td><?= htmlspecialchars($row['url']) ?></td>
+                    <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
                     <td><?= $row['total_configs'] ?></td>
                     <td><?= $row['valid_configs'] ?> / <?= $row['total_configs'] ?></td>
                     <td><?= $row['check_date'] ?></td>

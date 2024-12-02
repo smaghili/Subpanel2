@@ -102,6 +102,7 @@ if [ ! -f "$DB_PATH" ]; then
     );
     CREATE TABLE IF NOT EXISTS config_checks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
         url TEXT NOT NULL,
         total_configs INTEGER,
         valid_configs INTEGER,
