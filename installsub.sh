@@ -32,7 +32,23 @@ if [ ! -f "$BACKUP_CONFIG_FILE" ]; then
 fi
 
 # Install required packages in one command to reduce apt calls
-sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx php-fpm php-sqlite3 sqlite3 inotify-tools php-curl
+sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx php-fpm php-sqlite3 sqlite3 inotify-tools php-curl python3-pip
+
+# Install Python packages
+pip3 install aiohttp
+
+# Install Xray
+echo "Installing Xray..."
+bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root
+
+# Check if installations were successful
+if ! command -v xray &> /dev/null; then
+    show_error "Xray installation failed"
+fi
+
+if ! python3 -c "import aiohttp" &> /dev/null; then
+    show_error "aiohttp installation failed"
+fi
 
 PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;")
 PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
