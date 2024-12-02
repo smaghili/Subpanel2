@@ -25,7 +25,7 @@ BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
 SCRIPTS_DIR="/var/www/scripts"
 
 sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR
-//yes
+
 # Create backup config file
 if [ ! -f "$BACKUP_CONFIG_FILE" ]; then
     echo '{"telegram_bot_token":"","admin_ids":"","backup_interval":24,"last_backup":""}' > "$BACKUP_CONFIG_FILE"
