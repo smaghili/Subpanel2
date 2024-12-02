@@ -128,7 +128,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         .form-group {
             margin-bottom: 20px;
         }
-        input[type="url"] {
+        input[type="url"], input[type="text"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -234,10 +234,10 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <form method="POST" onsubmit="showLoading()">
             <div class="form-group">
-                <input type="text" name="config_name" placeholder="Enter Config Name" required>
+                <input type="text" name="config_name" placeholder="Enter Config Name" required style="margin-bottom: 10px;">
             </div>
             <div class="form-group">
-                <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required>
+                <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
             </div>
             <button type="submit">Check Configs</button>
         </form>
