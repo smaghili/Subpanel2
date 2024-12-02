@@ -21,8 +21,21 @@ function checkConfigs($url) {
     
     $script_path = '/var/www/scripts/v2raycheck.py';
     
-    // اجرای اسکریپت و انتظار برای تکمیل
-    exec("python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1", $output, $return_var);
+    // اجرای اسکریپت و نمایش خروجی در لحظه
+    $cmd = "python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1";
+    $handle = popen($cmd, 'r');
+    
+    echo "<pre>";
+    while (!feof($handle)) {
+        $buffer = fgets($handle);
+        echo $buffer;
+        flush();
+        ob_flush();
+        $output[] = $buffer;
+    }
+    echo "</pre>";
+    
+    pclose($handle);
     
     $total = 0;
     $valid = 0;
@@ -220,9 +233,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <div id="loading" class="loading">
             <p>Checking configs, please wait...</p>
-            <div class="progress">
-                <div class="progress-bar"></div>
-            </div>
+            <div id="live-output"></div>
         </div>
 
         <?php if ($results): ?>
