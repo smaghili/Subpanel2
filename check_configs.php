@@ -10,7 +10,9 @@ function checkConfigs($url) {
     $output = [];
     $return_var = 0;
     
-    exec("python3 v2raycheck.py -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1", $output, $return_var);
+    // مسیر کامل فایل v2raycheck.py در پوشه /var/www/scripts
+    $script_path = '/var/www/scripts/v2raycheck.py';
+    exec("python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1", $output, $return_var);
     
     // پردازش خروجی برای دریافت تعداد کانفیگ‌های معتبر و نامعتبر
     $total = 0;
@@ -41,7 +43,8 @@ $results = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
-    if (filter_var($url, FILTER_VALIDATE_URL)) {
+    // اجازه دادن به URL‌های خاص با کاراکترهای یونیکد
+    if (filter_var($url, FILTER_VALIDATE_URL) || preg_match('/^https?:\/\/[\w\-\.\u4e00-\u9fa5]+/u', $url)) {
         $results = checkConfigs($url);
         if ($results['success']) {
             $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';

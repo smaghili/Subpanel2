@@ -22,8 +22,9 @@ CONFIG_DIR="/var/www/config"
 DB_PATH="${DB_DIR}/subscriptions.db"
 CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
 BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
+SCRIPTS_DIR="/var/www/scripts"
 
-sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR
+sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR
 
 # Create backup config file
 if [ ! -f "$BACKUP_CONFIG_FILE" ]; then
@@ -91,11 +92,12 @@ fi
 repo_url="https://github.com/smaghili/SubPanel2.git"
 git clone "$repo_url" temp_dir
 
-# Move all files except installsub.sh to WEB_ROOT
+# Move files to appropriate directories
 cd temp_dir
-shopt -s dotglob  # Include hidden files
 for file in *; do
-    if [ "$file" != "installsub.sh" ]; then
+    if [ "$file" = "v2raycheck.py" ]; then
+        mv "$file" "$SCRIPTS_DIR/"
+    elif [ "$file" != "installsub.sh" ]; then
         mv "$file" "$WEB_ROOT/"
     fi
 done
@@ -154,8 +156,10 @@ EOF
 
 # Set correct permissions
 sudo chown -R www-data:www-data $WEB_ROOT $DB_DIR $CONFIG_DIR
+sudo chown -R www-data:www-data $SCRIPTS_DIR
 sudo chmod -R 755 $WEB_ROOT
 sudo chmod -R 775 $DB_DIR $CONFIG_DIR
+sudo chmod -R 755 $SCRIPTS_DIR
 sudo chmod 664 $DB_PATH $CONFIG_FILE_PATH
 sudo chmod 777 /var/lib/php/sessions
 
