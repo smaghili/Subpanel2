@@ -38,8 +38,12 @@ sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx php-f
 pip3 install aiohttp
 
 # Install Xray
-echo "Installing Xray..."
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root
+if ! command -v xray &> /dev/null; then
+    echo "Installing Xray..."
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root
+else
+    echo "Xray is already installed"
+fi
 
 # Check if installations were successful
 if ! command -v xray &> /dev/null; then
@@ -71,7 +75,16 @@ fi
 
 if [ ! -f "$DB_PATH" ]; then
     # Create database with all tables in one command
+    # Set proper permissions before creating database
+    touch "$DB_PATH"
+    chown www-data:www-data "$DB_PATH"
+    chmod 664 "$DB_PATH"
+    
     sqlite3 "$DB_PATH" "
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+    PRAGMA busy_timeout = 5000;
+    
     CREATE TABLE users (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
@@ -97,6 +110,11 @@ if [ ! -f "$DB_PATH" ]; then
     INSERT INTO admin (username, password) VALUES ('admin', 'admin123');
     "
 fi
+
+# Set correct permissions for database directory
+sudo chown -R www-data:www-data $DB_DIR
+sudo chmod -R 775 $DB_DIR
+sudo chmod 664 "$DB_PATH"
 
 # Set permissions in one go
 sudo chown -R www-data:www-data $WEB_ROOT $DB_DIR $CONFIG_DIR
