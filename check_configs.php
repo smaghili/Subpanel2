@@ -25,15 +25,10 @@ function checkConfigs($url) {
     $cmd = "PATH=/usr/local/bin:/usr/bin:$PATH /usr/bin/python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1";
     $handle = popen($cmd, 'r');
     
-    echo "<pre>";
     while (!feof($handle)) {
         $buffer = fgets($handle);
-        echo $buffer;
-        flush();
-        ob_flush();
         $output[] = $buffer;
     }
-    echo "</pre>";
     
     pclose($handle);
     
@@ -65,8 +60,13 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
     $url = $_POST['url'];
     $results = checkConfigs($url);
     if ($results['success']) {
-        // ذخیره نتایج جدید در دیتابیس
-        $stmt = $db->prepare('INSERT INTO config_checks (url, total_configs, valid_configs) VALUES (:url, :total, :valid)');
+        // بروزرسانی رکورد موجود
+        $stmt = $db->prepare('UPDATE config_checks SET 
+            total_configs = :total,
+            valid_configs = :valid,
+            check_date = CURRENT_TIMESTAMP
+            WHERE url = :url
+            ORDER BY check_date DESC LIMIT 1');
         $stmt->bindValue(':url', $url, SQLITE3_TEXT);
         $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
         $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
