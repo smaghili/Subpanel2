@@ -76,6 +76,11 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
 // بررسی اولیه URL
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
+    $bot_id = trim($_POST['bot_id']);
+    
+    // ذخیره نام بات در فایل
+    file_put_contents('/var/www/config/bot_id.txt', $bot_id);
+    
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
         // سپس کانفیگ‌ها را چک می‌کنیم
         $results = checkConfigs($url);
@@ -89,6 +94,83 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
             $stmt->execute();
             
             $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
+
+            // اگر نام بات وارد شده باشد، اطلاعات سرویس را هم چک می‌کنیم
+            if (!empty($bot_id)) {
+                $bot_output = shell_exec("python3 /var/www/scripts/monitor-bot.py");
+                $bot_data = json_decode($bot_output, true);
+                
+                if ($bot_data && !isset($bot_data['error'])) {
+                    // محاسبه روزهای باقی‌مانده
+                    $expiry = new DateTime($bot_data['expiry_date']);
+                    $now = new DateTime();
+                    $days_left = $now->diff($expiry)->days;
+                    
+                    // محاسبه درصدها
+                    $days_percentage = min(100, ($days_left / 30) * 100); // فرض 30 روزه
+                    $volume_percentage = min(100, ($bot_data['used_volume'] / $bot_data['total_volume']) * 100);
+                    
+                    // اضافه کردن به پیام موفقیت
+                    $message .= '
+                    <div class="service-stats">
+                        <div class="stat-box">
+                            <div class="stat-header">زمان اولیه شما</div>
+                            <div class="stat-value">30</div>
+                            <div class="stat-unit">روز</div>
+                            <div class="stat-header">زمان باقیمانده شما</div>
+                            <div class="stat-value">' . $days_left . '</div>
+                            <div class="stat-unit">روز</div>
+                            <div class="progress-circle" data-percentage="' . $days_percentage . '">
+                                <span class="progress-text">' . round($days_percentage) . '%</span>
+                            </div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-header">حجم اولیه شما</div>
+                            <div class="stat-value">' . $bot_data['total_volume'] . '</div>
+                            <div class="stat-unit">گیگابایت</div>
+                            <div class="stat-header">حجم باقیمانده شما</div>
+                            <div class="stat-value">' . ($bot_data['total_volume'] - $bot_data['used_volume']) . '</div>
+                            <div class="stat-unit">گیگابایت</div>
+                            <div class="progress-circle" data-percentage="' . $volume_percentage . '">
+                                <span class="progress-text">' . round($volume_percentage) . '%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                        document.querySelectorAll(".progress-circle").forEach(function(circle) {
+                            var percentage = circle.getAttribute("data-percentage");
+                            var color = percentage < 50 ? "#2ecc71" : percentage < 80 ? "#f1c40f" : "#e74c3c";
+                            var radius = 70;
+                            var circumference = 2 * Math.PI * radius;
+                            var offset = circumference - (percentage / 100) * circumference;
+                            
+                            circle.innerHTML = `
+                                <svg class="progress-ring" width="160" height="160">
+                                    <circle class="progress-ring-circle-bg" 
+                                        stroke="#eee"
+                                        stroke-width="8"
+                                        fill="transparent"
+                                        r="${radius}"
+                                        cx="80"
+                                        cy="80"/>
+                                    <circle class="progress-ring-circle"
+                                        stroke="${color}"
+                                        stroke-width="8"
+                                        fill="transparent"
+                                        r="${radius}"
+                                        cx="80"
+                                        cy="80"
+                                        style="stroke-dasharray: ${circumference} ${circumference}; 
+                                               stroke-dashoffset: ${offset};"/>
+                                </svg>
+                                <span class="progress-text">${Math.round(percentage)}%</span>
+                            `;
+                        });
+                    });
+                    </script>';
+                }
+            }
         } else {
             $message = '<div class="error">خطا در اجرای تست کانفیگ‌ها</div>';
         }
@@ -273,6 +355,56 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         button[type="submit"] {
             display: block;
             margin: 0 auto;
+        }
+        .service-stats {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #2a2f4c;
+            border-radius: 15px;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            position: relative;
+        }
+        .stat-header {
+            font-size: 14px;
+            color: #8e94b2;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+        .stat-unit {
+            font-size: 12px;
+            color: #8e94b2;
+            margin-bottom: 15px;
+        }
+        .progress-circle {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            margin: 0 auto;
+        }
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
         }
     </style>
 </head>

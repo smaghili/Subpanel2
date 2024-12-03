@@ -1,0 +1,111 @@
+from telethon import TelegramClient, events
+from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
+import re
+from datetime import datetime
+import asyncio
+import json
+import sys
+import os
+
+# تنظیمات اولیه
+api_id = "23933986"
+api_hash = "f61a82f32627f793c85704c163bf2547"
+session_file = 'tel_session'
+
+# خواندن نام بات از فایل
+def get_bot_username():
+    try:
+        with open('/var/www/config/bot_id.txt', 'r') as f:
+            return f.read().strip()
+    except:
+        return None
+
+async def check_service():
+    # چک کردن وجود فایل سشن
+    if not os.path.exists(f"{session_file}.session"):
+        error_result = {
+            "error": "Session file not found! Please create a session first.",
+            "total_volume": 0,
+            "used_volume": 0,
+            "expiry_date": None
+        }
+        print(json.dumps(error_result))
+        return
+        
+    # خواندن نام بات
+    bot_username = get_bot_username()
+    if not bot_username:
+        error_result = {
+            "error": "Bot username not found! Please set it in check_configs.php first.",
+            "total_volume": 0,
+            "used_volume": 0,
+            "expiry_date": None
+        }
+        print(json.dumps(error_result))
+        return
+
+    # استفاده از session file موجود
+    client = TelegramClient(session_file, api_id, api_hash)
+    
+    try:
+        await client.connect()
+        
+        # چک کردن اعتبار سشن
+        if not await client.is_user_authorized():
+            error_result = {
+                "error": "Session is invalid or expired. Please create a new session.",
+                "total_volume": 0,
+                "used_volume": 0,
+                "expiry_date": None
+            }
+            print(json.dumps(error_result))
+            return
+            
+        # ارسال دستور /services به ربات
+        await client.send_message(bot_username, '/services')
+        await asyncio.sleep(1)
+        
+        # دریافت پیام حاوی دکمه‌ها
+        message = await client.get_messages(bot_username, limit=1)
+        if message and message[0].reply_markup:
+            await message[0].click(0, 0)
+            await asyncio.sleep(1)
+            
+            # دریافت مستقیم آخرین پیام
+            response = await client.get_messages(bot_username, limit=1)
+            if response and response[0].text:
+                text = response[0].text
+                
+                # استخراج اطلاعات
+                total_volume = re.search(r'📦 حجم سرویس : (\d+(?:\.\d+)?)', text)
+                used_volume = re.search(r'📥 حجم مصرفی سرویس : (\d+(?:\.\d+)?)', text)
+                expiry_date = re.search(r'📆 تاریخ انقضای سرویس : (\d{4}/\d{2}/\d{2})', text)
+                
+                # ساخت دیکشنری برای خروجی
+                result = {
+                    "total_volume": float(total_volume.group(1)) if total_volume else 0,
+                    "used_volume": float(used_volume.group(1)) if used_volume else 0,
+                    "expiry_date": expiry_date.group(1) if expiry_date else None
+                }
+                
+                # چاپ نتیجه به صورت JSON
+                print(json.dumps(result))
+                
+    except Exception as e:
+        error_result = {
+            "error": str(e),
+            "total_volume": 0,
+            "used_volume": 0,
+            "expiry_date": None
+        }
+        print(json.dumps(error_result))
+    
+    finally:
+        await client.disconnect()
+
+def main():
+    # حذف بخش init و اجرای مستقیم چک سرویس
+    asyncio.run(check_service())
+
+if __name__ == "__main__":
+    main() 
