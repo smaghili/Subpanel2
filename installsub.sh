@@ -137,7 +137,7 @@ git clone "$repo_url" temp_dir
 # Move files to appropriate directories
 cd temp_dir
 for file in *; do
-    if [ "$file" = "v2raycheck.py" ]; then
+    if [ "$file" = "v2raycheck.py" ] || [ "$file" = "check_telegram_service.py" ]; then
         mv "$file" "$SCRIPTS_DIR/"
     elif [ "$file" != "installsub.sh" ]; then
         mv "$file" "$WEB_ROOT/"

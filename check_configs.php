@@ -79,6 +79,66 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
+        // اول اطلاعات تلگرام را چک می‌کنیم
+        if (isset($_POST['bot_id'])) {
+            $cmd = "python3 /var/www/scripts/check_telegram_service.py " . escapeshellarg($_POST['bot_id']);
+            $telegram_output = shell_exec($cmd);
+            $usage_data = json_decode($telegram_output, true);
+            
+            if ($usage_data) {
+                // نمایش نمودار دایره‌ای
+                echo '<div class="stats-container">
+                    <div class="stat-box">
+                        <h3>Usage Statistics</h3>
+                        <div class="usage-chart">
+                            <canvas id="usageChart"></canvas>
+                        </div>
+                        <p>Total Volume: ' . $usage_data['total_volume'] . ' GB</p>
+                        <p>Used Volume: ' . $usage_data['used_volume'] . ' GB</p>
+                        <p>Expiry Date: ' . $usage_data['expiry_date'] . '</p>
+                    </div>
+                </div>';
+                
+                echo '<script>
+                const ctx = document.getElementById("usageChart").getContext("2d");
+                new Chart(ctx, {
+                    type: "doughnut",
+                    data: {
+                        datasets: [{
+                            data: [' . $usage_data['used_volume'] . ', ' . 
+                                  ($usage_data['total_volume'] - $usage_data['used_volume']) . '],
+                            backgroundColor: ["#28a745", "#dc3545"]
+                        }],
+                        labels: ["Remaining", "Used"]
+                    },
+                    options: {
+                        cutout: "70%",
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                enabled: true
+                            }
+                        },
+                        animation: {
+                            onComplete: function(animation) {
+                                var ctx = this.chart.ctx;
+                                var percentage = Math.round((<?= $usage_data['used_volume'] ?> / <?= $usage_data['total_volume'] ?>) * 100);
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.font = 'bold 20px Arial';
+                                ctx.fillStyle = '#333';
+                                ctx.fillText(percentage + '%', this.chart.width / 2, this.chart.height / 2);
+                            }
+                        }
+                    }
+                });
+                </script>';
+            }
+        }
+
+        // سپس کانفیگ‌ها را چک می‌کنیم
         $results = checkConfigs($url);
         if ($results['success']) {
             // ذخیره نتایج در دیتابیس
@@ -107,6 +167,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 <head>
     <meta charset="UTF-8">
     <title>Check Subscription Configs</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -220,6 +281,22 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         .history-table a:hover {
             text-decoration: underline;
         }
+        .usage-chart {
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+        }
+        .stats-container {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .stat-box {
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -239,6 +316,9 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             <div class="form-group">
                 <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
             </div>
+            <div class="form-group">
+                <input type="text" name="bot_id" placeholder="Enter Telegram Bot ID" required style="margin-bottom: 10px;">
+            </div>
             <button type="submit">Check Configs</button>
         </form>
 
@@ -249,6 +329,20 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <?php if ($results): ?>
         <div class="results">
+            <?php if ($usage_data): ?>
+            <div class="stats-container">
+                <div class="stat-box">
+                    <h3>Usage Statistics</h3>
+                    <div class="usage-chart">
+                        <canvas id="usageChart"></canvas>
+                    </div>
+                    <p>Total Volume: <?= $usage_data['total_volume'] ?> GB</p>
+                    <p>Used Volume: <?= $usage_data['used_volume'] ?> GB</p>
+                    <p>Expiry Date: <?= $usage_data['expiry_date'] ?></p>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="stat">
                 <span class="stat-label">Total Configs:</span>
                 <span><?= $results['total'] ?></span>
