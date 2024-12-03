@@ -248,6 +248,29 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         .auth-button:hover {
             background-color: #006699;
         }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
@@ -262,10 +285,13 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <form method="POST" onsubmit="showLoading()">
             <div class="form-group">
-                <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
+                <input type="text" name="config_name" placeholder="Config Name" required style="margin-bottom: 10px;">
             </div>
             <div class="form-group">
-                <input type="text" name="bot_name" placeholder="Bot Name" required style="margin-bottom: 10px;">
+                <input type="url" name="subscription_url" placeholder="Subscription URL" required style="margin-bottom: 10px;">
+            </div>
+            <div class="form-group">
+                <input type="text" name="bot_id" placeholder="Bot ID" required style="margin-bottom: 10px;">
             </div>
             <button type="submit">Check Configs</button>
         </form>
