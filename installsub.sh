@@ -23,8 +23,9 @@ DB_PATH="${DB_DIR}/subscriptions.db"
 CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
 BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
 SCRIPTS_DIR="/var/www/scripts"
+SESSIONS_DIR="/var/www/sessions"
 
-sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR
+sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR $SESSIONS_DIR
 
 # Create backup config file
 if [ ! -f "$BACKUP_CONFIG_FILE" ]; then
@@ -119,6 +120,8 @@ sudo chmod 664 "$DB_PATH"
 
 # Set permissions in one go
 sudo chown -R www-data:www-data $WEB_ROOT $DB_DIR $CONFIG_DIR
+sudo chown -R www-data:www-data $SCRIPTS_DIR
+sudo chown -R www-data:www-data $SESSIONS_DIR
 sudo chmod -R 755 $WEB_ROOT
 sudo chmod -R 775 $DB_DIR $CONFIG_DIR
 sudo chmod 664 $DB_PATH $CONFIG_FILE_PATH

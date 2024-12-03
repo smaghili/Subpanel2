@@ -8,6 +8,7 @@ import os
 api_id = "23933986"
 api_hash = "f61a82f32627f793c85704c163bf2547"
 session_file = '/var/www/sessions/telegram_session'
+phone_file = '/var/www/sessions/phone.txt'
 
 async def check_auth():
     client = TelegramClient(session_file, api_id, api_hash)
@@ -24,13 +25,17 @@ async def delete_session():
     try:
         if os.path.exists(session_file):
             os.remove(session_file)
-            print(json.dumps({"status": "success"}))
-        else:
-            print(json.dumps({"status": "error", "message": "Session file not found"}))
+        if os.path.exists(phone_file):
+            os.remove(phone_file)
+        print(json.dumps({"status": "success"}))
     except Exception as e:
         print(json.dumps({"status": "error", "message": str(e)}))
 
 async def start_auth(phone):
+    # ذخیره شماره تلفن در فایل
+    with open(phone_file, 'w') as f:
+        f.write(phone)
+        
     client = TelegramClient(session_file, api_id, api_hash)
     await client.connect()
     
@@ -46,19 +51,33 @@ async def start_auth(phone):
     await client.disconnect()
 
 async def verify_code(code):
-    client = TelegramClient(session_file, api_id, api_hash)
-    await client.connect()
-    
     try:
-        await client.sign_in(code=code)
-        print(json.dumps({"status": "success"}))
+        # خواندن شماره تلفن از فایل
+        if not os.path.exists(phone_file):
+            print(json.dumps({"status": "error", "message": "Please send phone number first"}))
+            return
+            
+        with open(phone_file, 'r') as f:
+            phone = f.read().strip()
+            
+        client = TelegramClient(session_file, api_id, api_hash)
+        await client.connect()
+        
+        try:
+            await client.sign_in(phone, code)
+            # حذف فایل شماره تلفن بعد از موفقیت
+            if os.path.exists(phone_file):
+                os.remove(phone_file)
+            print(json.dumps({"status": "success"}))
+        except Exception as e:
+            if "2FA" in str(e):
+                print(json.dumps({"status": "password_needed"}))
+            else:
+                print(json.dumps({"status": "error", "message": str(e)}))
+        
+        await client.disconnect()
     except Exception as e:
-        if "2FA" in str(e):
-            print(json.dumps({"status": "password_needed"}))
-        else:
-            print(json.dumps({"status": "error", "message": str(e)}))
-    
-    await client.disconnect()
+        print(json.dumps({"status": "error", "message": str(e)}))
 
 async def verify_2fa(password):
     client = TelegramClient(session_file, api_id, api_hash)
@@ -66,6 +85,9 @@ async def verify_2fa(password):
     
     try:
         await client.sign_in(password=password)
+        # حذف فایل شماره تلفن در صورت موفقیت
+        if os.path.exists(phone_file):
+            os.remove(phone_file)
         print(json.dumps({"status": "success"}))
     except Exception as e:
         print(json.dumps({"status": "error", "message": str(e)}))
