@@ -262,10 +262,10 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <form method="POST" onsubmit="showLoading()">
             <div class="form-group">
-                <input type="text" name="config_name" placeholder="Enter Config Name" required style="margin-bottom: 10px;">
+                <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
             </div>
             <div class="form-group">
-                <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
+                <input type="text" name="bot_name" placeholder="Bot Name" required style="margin-bottom: 10px;">
             </div>
             <button type="submit">Check Configs</button>
         </form>
