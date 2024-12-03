@@ -149,6 +149,8 @@ done
 cd ..
 rm -rf temp_dir
 
+# Create and run Telegram session
+python3 $SCRIPTS_DIR/telegram-session.py
 
 sed -i 's/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/' /etc/php/${PHP_VERSION}/fpm/php.ini
 sudo systemctl restart $PHP_FPM_SERVICE
