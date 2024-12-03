@@ -103,13 +103,8 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                 $bot_data = json_decode($bot_output, true);
                 
                 if ($bot_data && !isset($bot_data['error'])) {
-                    // محاسبه روزهای باقی‌مانده
-                    $expiry = new DateTime($bot_data['expiry_date']);
-                    $now = new DateTime();
-                    $days_left = $now->diff($expiry)->days;
-                    
                     // محاسبه درصدها
-                    $days_percentage = min(100, ($days_left / 30) * 100); // فرض 30 روزه
+                    $days_percentage = min(100, ($bot_data['days_left'] / 30) * 100); // فرض 30 روزه
                     $volume_percentage = min(100, ($bot_data['used_volume'] / $bot_data['total_volume']) * 100);
                     
                     // اضافه کردن به پیام موفقیت
@@ -117,13 +112,16 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                     <div class="service-stats">
                         <div class="stat-box">
                             <div class="stat-header">زمان باقیمانده شما</div>
-                            <div class="stat-value">' . $days_left . '</div>
+                            <div class="stat-value">' . $bot_data['days_left'] . '</div>
                             <div class="stat-unit">روز</div>
                             <div class="progress-circle" data-percentage="' . $days_percentage . '">
                                 <span class="progress-text">' . round($days_percentage) . '%</span>
                             </div>
                         </div>
                         <div class="stat-box">
+                            <div class="stat-header">حجم اولیه شما</div>
+                            <div class="stat-value">' . $bot_data['total_volume'] . '</div>
+                            <div class="stat-unit">گیگابایت</div>
                             <div class="stat-header">حجم باقیمانده شما</div>
                             <div class="stat-value">' . ($bot_data['total_volume'] - $bot_data['used_volume']) . '</div>
                             <div class="stat-unit">گیگابایت</div>
