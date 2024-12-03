@@ -78,7 +78,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
     $url = trim($_POST['subscription_url']);
     $bot_id = trim($_POST['bot_id']);
     
-    // ذخی��ه نام بات در فایل
+    // ذخیره نام بات در فایل
     file_put_contents('/var/www/config/bot_id.txt', $bot_id);
     
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
@@ -116,9 +116,6 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                     $message .= '
                     <div class="service-stats">
                         <div class="stat-box">
-                            <div class="stat-header">زمان اولیه شما</div>
-                            <div class="stat-value">30</div>
-                            <div class="stat-unit">روز</div>
                             <div class="stat-header">زمان باقیمانده شما</div>
                             <div class="stat-value">' . $days_left . '</div>
                             <div class="stat-unit">روز</div>
@@ -127,9 +124,6 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                             </div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-header">حجم اولیه شما</div>
-                            <div class="stat-value">' . $bot_data['total_volume'] . '</div>
-                            <div class="stat-unit">گیگابایت</div>
                             <div class="stat-header">حجم باقیمانده شما</div>
                             <div class="stat-value">' . ($bot_data['total_volume'] - $bot_data['used_volume']) . '</div>
                             <div class="stat-unit">گیگابایت</div>

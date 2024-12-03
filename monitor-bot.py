@@ -2,6 +2,7 @@ from telethon import TelegramClient, events
 from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
 import re
 from datetime import datetime
+import jdatetime
 import asyncio
 import json
 import sys
@@ -12,6 +13,19 @@ api_id = "23933986"
 api_hash = "f61a82f32627f793c85704c163bf2547"
 session_dir = '/var/www/sessions'
 session_file = os.path.join(session_dir, 'tel_session')
+
+# تبدیل تاریخ شمسی به میلادی
+def convert_persian_date(persian_date_str):
+    try:
+        # تبدیل رشته به اجزای عددی
+        year, month, day = map(int, persian_date_str.split('/'))
+        # تبدیل تاریخ شمسی به میلادی
+        persian_date = jdatetime.date(year, month, day)
+        gregorian_date = persian_date.togregorian()
+        return gregorian_date.strftime('%Y-%m-%d')
+    except Exception as e:
+        print(f"Error converting date: {str(e)}")
+        return None
 
 # خواندن نام بات از فایل
 def get_bot_username():
@@ -28,7 +42,8 @@ async def check_service():
             "error": "Session file not found! Please create a session first.",
             "total_volume": 0,
             "used_volume": 0,
-            "expiry_date": None
+            "expiry_date": None,
+            "days_left": 0
         }
         print(json.dumps(error_result))
         return
@@ -40,7 +55,8 @@ async def check_service():
             "error": "Bot username not found! Please set it in check_configs.php first.",
             "total_volume": 0,
             "used_volume": 0,
-            "expiry_date": None
+            "expiry_date": None,
+            "days_left": 0
         }
         print(json.dumps(error_result))
         return
@@ -57,7 +73,8 @@ async def check_service():
                 "error": "Session is invalid or expired. Please create a new session.",
                 "total_volume": 0,
                 "used_volume": 0,
-                "expiry_date": None
+                "expiry_date": None,
+                "days_left": 0
             }
             print(json.dumps(error_result))
             return
@@ -82,11 +99,21 @@ async def check_service():
                 used_volume = re.search(r'📥 حجم مصرفی سرویس : (\d+(?:\.\d+)?)', text)
                 expiry_date = re.search(r'📆 تاریخ انقضای سرویس : (\d{4}/\d{2}/\d{2})', text)
                 
+                # تبدیل تاریخ شمسی به میلادی و محاسبه روزهای باقیمانده
+                days_left = 0
+                if expiry_date:
+                    gregorian_date = convert_persian_date(expiry_date.group(1))
+                    if gregorian_date:
+                        expiry = datetime.strptime(gregorian_date, '%Y-%m-%d')
+                        now = datetime.now()
+                        days_left = (expiry - now).days
+                
                 # ساخت دیکشنری برای خروجی
                 result = {
                     "total_volume": float(total_volume.group(1)) if total_volume else 0,
                     "used_volume": float(used_volume.group(1)) if used_volume else 0,
-                    "expiry_date": expiry_date.group(1) if expiry_date else None
+                    "expiry_date": expiry_date.group(1) if expiry_date else None,
+                    "days_left": max(0, days_left)  # اگر منفی بود، صفر برمی‌گرداند
                 }
                 
                 # چاپ نتیجه به صورت JSON
@@ -97,7 +124,8 @@ async def check_service():
             "error": str(e),
             "total_volume": 0,
             "used_volume": 0,
-            "expiry_date": None
+            "expiry_date": None,
+            "days_left": 0
         }
         print(json.dumps(error_result))
     
