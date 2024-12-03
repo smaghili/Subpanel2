@@ -78,7 +78,7 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
 // بررسی اولیه URL
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
-    if (filter_var($url, FILTER_VALIDATE_URL) || preg_match('/^https?:\/\/[\w\-\.\u4e00-\u9fa5]+/u', $url)) {
+    if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
         $results = checkConfigs($url);
         if ($results['success']) {
             // ذخیره نتایج در دیتابیس
