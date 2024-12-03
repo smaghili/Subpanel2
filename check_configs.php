@@ -77,73 +77,6 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
-        // اول اطلاعات تلگرام را چک می‌کنیم
-        if (isset($_POST['bot_id']) && !empty($_POST['bot_id'])) {
-            $cmd = "python3 /var/www/scripts/check_telegram_service.py " . escapeshellarg($_POST['bot_id']) . " 2>&1";
-            $telegram_output = shell_exec($cmd);
-            $usage_data = json_decode($telegram_output, true);
-            
-            if ($usage_data && isset($usage_data['total_volume']) && isset($usage_data['used_volume']) && isset($usage_data['expiry_date'])) {
-                $used = floatval($usage_data['used_volume']);
-                $total = floatval($usage_data['total_volume']);
-                $remaining = $total - $used;
-                $percentage = round(($used / $total) * 100);
-
-                echo '<div class="stats-container">
-                    <div class="stat-box">
-                        <h3>Usage Statistics</h3>
-                        <div class="usage-chart">
-                            <canvas id="usageChart"></canvas>
-                        </div>
-                        <p>Total Volume: ' . $total . ' GB</p>
-                        <p>Used Volume: ' . $used . ' GB</p>
-                        <p>Expiry Date: ' . $usage_data['expiry_date'] . '</p>
-                    </div>
-                </div>';
-                
-                echo '<script>
-                const ctx = document.getElementById("usageChart").getContext("2d");
-                new Chart(ctx, {
-                    type: "doughnut",
-                    data: {
-                        datasets: [{
-                            data: [' . $remaining . ', ' . $used . '],
-                            backgroundColor: ["#28a745", "#dc3545"]
-                        }],
-                        labels: ["Remaining", "Used"]
-                    },
-                    options: {
-                        cutout: "70%",
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                enabled: true
-                            }
-                        },
-                        animation: {
-                            onComplete: function(animation) {
-                                var ctx = this.chart.ctx;
-                                var percentage = ' . $percentage . ';
-                                ctx.textAlign = "center";
-                                ctx.textBaseline = "middle";
-                                ctx.font = "bold 20px Arial";
-                                ctx.fillStyle = "#333";
-                                ctx.fillText(percentage + "%", this.chart.width / 2, this.chart.height / 2);
-                            }
-                        }
-                    }
-                });
-                </script>';
-            } else {
-                // نمایش تمام لاگ‌ها و خروجی‌های اسکریپت پایتون
-                echo '<div class="error" style="white-space: pre-wrap; direction: ltr; text-align: left; font-family: monospace;">';
-                echo htmlspecialchars($telegram_output);
-                echo '</div>';
-            }
-        }
-
         // سپس کانفیگ‌ها را چک می‌کنیم
         $results = checkConfigs($url);
         if ($results['success']) {
@@ -334,10 +267,6 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             <div class="form-group">
                 <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
             </div>
-            <div class="form-group">
-                <input type="text" name="bot_id" placeholder="Enter Telegram Bot ID (Optional)" style="margin-bottom: 10px;">
-                <button type="button" onclick="openTelegramAuth()" class="auth-button">احراز هویت تلگرام</button>
-            </div>
             <button type="submit">Check Configs</button>
         </form>
 
@@ -348,20 +277,6 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 
         <?php if ($results): ?>
         <div class="results">
-            <?php if ($usage_data): ?>
-            <div class="stats-container">
-                <div class="stat-box">
-                    <h3>Usage Statistics</h3>
-                    <div class="usage-chart">
-                        <canvas id="usageChart"></canvas>
-                    </div>
-                    <p>Total Volume: <?= $usage_data['total_volume'] ?> GB</p>
-                    <p>Used Volume: <?= $usage_data['used_volume'] ?> GB</p>
-                    <p>Expiry Date: <?= $usage_data['expiry_date'] ?></p>
-                </div>
-            </div>
-            <?php endif; ?>
-
             <div class="stat">
                 <span class="stat-label">Total Configs:</span>
                 <span><?= $results['total'] ?></span>
@@ -410,10 +325,6 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
     </div>
 
     <script>
-        function openTelegramAuth() {
-            window.open('telegram_auth.php', 'تایید هویت تلگرام', 'width=500,height=600');
-        }
-        
         function showLoading() {
             document.getElementById('loading').style.display = 'block';
         }
