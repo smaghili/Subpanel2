@@ -35,7 +35,7 @@ fi
 sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx php-fpm php-sqlite3 sqlite3 inotify-tools php-curl python3-pip
 
 # Install Python packages
-pip3 install aiohttp
+pip3 install aiohttp telethon
 
 # Install Xray
 if ! command -v xray &> /dev/null; then
