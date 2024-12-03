@@ -6,24 +6,49 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 $message = '';
+$is_authorized = false;
+
+// بررسی وجود session تلگرام
+$cmd = "python3 /var/www/scripts/telegram_auth.py check_auth 2>&1";
+$output = shell_exec($cmd);
+$result = json_decode($output, true);
+if ($result && isset($result['status']) && $result['status'] === 'authorized') {
+    $is_authorized = true;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['phone'])) {
-        // ذخیره شماره تلفن در سشن
-        $_SESSION['telegram_phone'] = $_POST['phone'];
-        $cmd = "python3 /var/www/scripts/telegram_auth.py start " . escapeshellarg($_POST['phone']);
+    if (isset($_POST['delete_session'])) {
+        // حذف session تلگرام
+        $cmd = "python3 /var/www/scripts/telegram_auth.py delete_session 2>&1";
         $output = shell_exec($cmd);
+        $result = json_decode($output, true);
+        if ($result && isset($result['status']) && $result['status'] === 'success') {
+            $is_authorized = false;
+            $message = 'اکانت تلگرام با موفقیت حذف شد';
+        } else {
+            $message = 'خطا در حذف اکانت تلگرام';
+        }
+    } else if (isset($_POST['phone'])) {
+        // کد قبلی مربوط به ارسال شماره تلفن
+        $_SESSION['telegram_phone'] = $_POST['phone'];
+        $cmd = "python3 /var/www/scripts/telegram_auth.py start " . escapeshellarg($_POST['phone']) . " 2>&1";
+        $output = shell_exec($cmd);
+        error_log("Telegram auth output for phone: " . $output);
         $result = json_decode($output, true);
         
         if ($result && isset($result['status']) && $result['status'] === 'code_needed') {
             echo json_encode(['status' => 'code_needed']);
             exit;
+        } else {
+            echo json_encode(['status' => 'error', 'message' => $output]);
+            exit;
         }
     } 
     else if (isset($_POST['code'])) {
         // تایید کد
-        $cmd = "python3 /var/www/scripts/telegram_auth.py verify_code " . escapeshellarg($_POST['code']);
+        $cmd = "python3 /var/www/scripts/telegram_auth.py verify_code " . escapeshellarg($_POST['code']) . " 2>&1";
         $output = shell_exec($cmd);
+        error_log("Telegram auth output for code: " . $output);
         $result = json_decode($output, true);
         
         if ($result && isset($result['status'])) {
@@ -33,22 +58,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else if ($result['status'] === 'success') {
                 echo json_encode(['status' => 'success']);
                 exit;
+            } else {
+                echo json_encode(['status' => 'error', 'message' => $output]);
+                exit;
             }
+        } else {
+            echo json_encode(['status' => 'error', 'message' => $output]);
+            exit;
         }
     }
     else if (isset($_POST['password'])) {
         // تایید پسورد two-step
-        $cmd = "python3 /var/www/scripts/telegram_auth.py verify_2fa " . escapeshellarg($_POST['password']);
+        $cmd = "python3 /var/www/scripts/telegram_auth.py verify_2fa " . escapeshellarg($_POST['password']) . " 2>&1";
         $output = shell_exec($cmd);
+        error_log("Telegram auth output for 2FA: " . $output);
         $result = json_decode($output, true);
         
         if ($result && isset($result['status']) && $result['status'] === 'success') {
             echo json_encode(['status' => 'success']);
             exit;
+        } else {
+            echo json_encode(['status' => 'error', 'message' => $output]);
+            exit;
         }
     }
     
-    echo json_encode(['status' => 'error', 'message' => 'خطا در احراز هویت']);
+    echo json_encode(['status' => 'error', 'message' => 'درخواست نامعتبر']);
     exit;
 }
 ?>
@@ -119,6 +154,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         #codeForm, #passwordForm {
             display: none;
         }
+        .success-container {
+            text-align: center;
+            padding: 20px;
+        }
+        .delete-button {
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+        .status-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -131,69 +186,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </p>
         <?php endif; ?>
         
-        <form id="phoneForm">
-            <div class="form-group">
-                <label for="phone">شماره تلفن (با کد کشور):</label>
-                <input type="text" id="phone" name="phone" placeholder="+98912..." required>
+        <?php if ($is_authorized): ?>
+            <div class="success-container">
+                <div class="status-icon">✅</div>
+                <h2>احراز هویت انجام شده است</h2>
+                <p>شما با موفقیت به تلگرام متصل شده‌اید</p>
+                <form method="post" onsubmit="return confirm('آیا مطمئن هستید که می‌خواهید اکانت تلگرام را حذف کنید؟');">
+                    <input type="hidden" name="delete_session" value="1">
+                    <button type="submit" class="delete-button">حذف اکانت تلگرام</button>
+                </form>
             </div>
-            <button type="submit">ارسال کد تایید</button>
-        </form>
+        <?php else: ?>
+            <form id="phoneForm">
+                <div class="form-group">
+                    <label for="phone">شماره تلفن (با کد کشور):</label>
+                    <input type="text" id="phone" name="phone" placeholder="+98912..." required>
+                </div>
+                <button type="submit">ارسال کد تایید</button>
+            </form>
 
-        <form id="codeForm">
-            <div class="form-group">
-                <label for="code">کد تایید:</label>
-                <input type="text" id="code" name="code" required>
-            </div>
-            <button type="submit">تایید کد</button>
-        </form>
+            <form id="codeForm" style="display: none;">
+                <div class="form-group">
+                    <label for="code">کد تایید:</label>
+                    <input type="text" id="code" name="code" required>
+                </div>
+                <button type="submit">تایید کد</button>
+            </form>
 
-        <form id="passwordForm">
-            <div class="form-group">
-                <label for="password">رمز عبور تایید دو مرحله‌ای:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">تایید رمز عبور</button>
-        </form>
+            <form id="passwordForm" style="display: none;">
+                <div class="form-group">
+                    <label for="password">رمز عبور تایید دو مرحله‌ای:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">تایید رمز عبور</button>
+            </form>
+        <?php endif; ?>
     </div>
 
     <script>
+        async function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.container').insertBefore(errorDiv, document.querySelector('form'));
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
         document.getElementById('phoneForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const response = await fetch('telegram_auth.php', {
-                method: 'POST',
-                body: new FormData(e.target)
-            });
-            const result = await response.json();
-            if (result.status === 'code_needed') {
-                document.getElementById('phoneForm').style.display = 'none';
-                document.getElementById('codeForm').style.display = 'block';
+            try {
+                const response = await fetch('telegram_auth.php', {
+                    method: 'POST',
+                    body: new FormData(e.target)
+                });
+                const result = await response.json();
+                console.log('Phone submit result:', result);
+                
+                if (result.status === 'code_needed') {
+                    document.getElementById('phoneForm').style.display = 'none';
+                    document.getElementById('codeForm').style.display = 'block';
+                } else if (result.status === 'error') {
+                    showError(result.message || 'خطا در ارسال کد');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('خطا در ارتباط با سرور');
             }
         });
 
         document.getElementById('codeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const response = await fetch('telegram_auth.php', {
-                method: 'POST',
-                body: new FormData(e.target)
-            });
-            const result = await response.json();
-            if (result.status === 'password_needed') {
-                document.getElementById('codeForm').style.display = 'none';
-                document.getElementById('passwordForm').style.display = 'block';
-            } else if (result.status === 'success') {
-                window.close();
+            try {
+                const response = await fetch('telegram_auth.php', {
+                    method: 'POST',
+                    body: new FormData(e.target)
+                });
+                const result = await response.json();
+                console.log('Code submit result:', result);
+                
+                if (result.status === 'password_needed') {
+                    document.getElementById('codeForm').style.display = 'none';
+                    document.getElementById('passwordForm').style.display = 'block';
+                } else if (result.status === 'success') {
+                    window.close();
+                } else if (result.status === 'error') {
+                    showError(result.message || 'خطا در تایید کد');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('خطا در ارتباط با سرور');
             }
         });
 
         document.getElementById('passwordForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const response = await fetch('telegram_auth.php', {
-                method: 'POST',
-                body: new FormData(e.target)
-            });
-            const result = await response.json();
-            if (result.status === 'success') {
-                window.close();
+            try {
+                const response = await fetch('telegram_auth.php', {
+                    method: 'POST',
+                    body: new FormData(e.target)
+                });
+                const result = await response.json();
+                console.log('Password submit result:', result);
+                
+                if (result.status === 'success') {
+                    window.close();
+                } else if (result.status === 'error') {
+                    showError(result.message || 'خطا در تایید رمز عبور');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('خطا در ارتباط با سرور');
             }
         });
     </script>

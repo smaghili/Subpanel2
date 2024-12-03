@@ -9,6 +9,27 @@ api_id = "23933986"
 api_hash = "f61a82f32627f793c85704c163bf2547"
 session_file = '/var/www/sessions/telegram_session'
 
+async def check_auth():
+    client = TelegramClient(session_file, api_id, api_hash)
+    await client.connect()
+    
+    is_authorized = await client.is_user_authorized()
+    await client.disconnect()
+    
+    print(json.dumps({
+        "status": "authorized" if is_authorized else "unauthorized"
+    }))
+
+async def delete_session():
+    try:
+        if os.path.exists(session_file):
+            os.remove(session_file)
+            print(json.dumps({"status": "success"}))
+        else:
+            print(json.dumps({"status": "error", "message": "Session file not found"}))
+    except Exception as e:
+        print(json.dumps({"status": "error", "message": str(e)}))
+
 async def start_auth(phone):
     client = TelegramClient(session_file, api_id, api_hash)
     await client.connect()
@@ -52,18 +73,30 @@ async def verify_2fa(password):
     await client.disconnect()
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print(json.dumps({"status": "error", "message": "Invalid arguments"}))
         sys.exit(1)
     
     action = sys.argv[1]
-    value = sys.argv[2]
     
-    if action == "start":
-        asyncio.run(start_auth(value))
+    if action == "check_auth":
+        asyncio.run(check_auth())
+    elif action == "delete_session":
+        asyncio.run(delete_session())
+    elif action == "start":
+        if len(sys.argv) < 3:
+            print(json.dumps({"status": "error", "message": "Phone number required"}))
+            sys.exit(1)
+        asyncio.run(start_auth(sys.argv[2]))
     elif action == "verify_code":
-        asyncio.run(verify_code(value))
+        if len(sys.argv) < 3:
+            print(json.dumps({"status": "error", "message": "Code required"}))
+            sys.exit(1)
+        asyncio.run(verify_code(sys.argv[2]))
     elif action == "verify_2fa":
-        asyncio.run(verify_2fa(value))
+        if len(sys.argv) < 3:
+            print(json.dumps({"status": "error", "message": "Password required"}))
+            sys.exit(1)
+        asyncio.run(verify_2fa(sys.argv[2]))
     else:
         print(json.dumps({"status": "error", "message": "Invalid action"})) 
