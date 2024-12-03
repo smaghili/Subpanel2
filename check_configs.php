@@ -26,16 +26,9 @@ function checkConfigs($url) {
     
     $script_path = '/var/www/scripts/v2raycheck.py';
     
-    // اجرای اسکریپت و نمایش خروجی در لحظه
-    $cmd = "PATH=/usr/local/bin:/usr/bin:$PATH /usr/bin/python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1";
-    $handle = popen($cmd, 'r');
+    $cmd = "PATH=/usr/local/bin:/usr/bin:/bin python3 $script_path -config \"$url\" -save \"/tmp/valid_configs.txt\" -position start 2>&1";
     
-    while (!feof($handle)) {
-        $buffer = fgets($handle);
-        $output[] = $buffer;
-    }
-    
-    pclose($handle);
+    exec($cmd, $output, $return_var);
     
     $total = 0;
     $valid = 0;
