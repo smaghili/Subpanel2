@@ -9,7 +9,6 @@ import json
 # تنظیمات اولیه
 api_id = "23933986"
 api_hash = "f61a82f32627f793c85704c163bf2547"
-bot_username = "SvnProBot"
 
 async def main():
     # ایجاد کلاینت
@@ -17,7 +16,11 @@ async def main():
     
     try:
         # دریافت bot_id از آرگومان‌های خط فرمان
-        bot_id = sys.argv[1] if len(sys.argv) > 1 else "SvnProBot"
+        if len(sys.argv) <= 1:
+            print(json.dumps({"error": "لطفا شناسه ربات را وارد کنید"}))
+            return
+            
+        bot_id = sys.argv[1]
         
         # ارسال دستور /services به ربات
         await client.send_message(bot_id, '/services')

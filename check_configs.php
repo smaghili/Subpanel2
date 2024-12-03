@@ -77,13 +77,16 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
-        // اول اطلاعات تلگرام را چک می‌کنیم
-        if (isset($_POST['bot_id']) && !empty($_POST['bot_id'])) {
+        $telegram_info = false;
+        
+        // فقط اگر ایدی ربات وارد شده باشد، اطلاعات تلگرام را چک می‌کنیم
+        if (!empty($_POST['bot_id'])) {
             $cmd = "python3 /var/www/scripts/check_telegram_service.py " . escapeshellarg($_POST['bot_id']);
             $telegram_output = shell_exec($cmd);
             $usage_data = json_decode($telegram_output, true);
             
             if ($usage_data && isset($usage_data['total_volume']) && isset($usage_data['used_volume']) && isset($usage_data['expiry_date'])) {
+                $telegram_info = true;
                 $used = floatval($usage_data['used_volume']);
                 $total = floatval($usage_data['total_volume']);
                 $remaining = $total - $used;
@@ -136,7 +139,8 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                     }
                 });
                 </script>';
-            } else {
+            } else if (!empty($_POST['bot_id'])) {
+                // فقط اگر ایدی ربات وارد شده باشد و خطا رخ داده باشد، پیام خطا نمایش داده می‌شود
                 echo '<div class="error">خطا در دریافت اطلاعات تلگرام</div>';
             }
         }
