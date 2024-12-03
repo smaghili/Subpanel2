@@ -90,16 +90,20 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
             $telegram_output = shell_exec($cmd);
             $usage_data = json_decode($telegram_output, true);
             
-            if ($usage_data) {
-                // نمایش نمودار دایره‌ای
+            if ($usage_data && isset($usage_data['total_volume']) && isset($usage_data['used_volume']) && isset($usage_data['expiry_date'])) {
+                $used = floatval($usage_data['used_volume']);
+                $total = floatval($usage_data['total_volume']);
+                $remaining = $total - $used;
+                $percentage = round(($used / $total) * 100);
+
                 echo '<div class="stats-container">
                     <div class="stat-box">
                         <h3>Usage Statistics</h3>
                         <div class="usage-chart">
                             <canvas id="usageChart"></canvas>
                         </div>
-                        <p>Total Volume: ' . $usage_data['total_volume'] . ' GB</p>
-                        <p>Used Volume: ' . $usage_data['used_volume'] . ' GB</p>
+                        <p>Total Volume: ' . $total . ' GB</p>
+                        <p>Used Volume: ' . $used . ' GB</p>
                         <p>Expiry Date: ' . $usage_data['expiry_date'] . '</p>
                     </div>
                 </div>';
@@ -110,8 +114,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                     type: "doughnut",
                     data: {
                         datasets: [{
-                            data: [' . $usage_data['used_volume'] . ', ' . 
-                                  ($usage_data['total_volume'] - $usage_data['used_volume']) . '],
+                            data: [' . $remaining . ', ' . $used . '],
                             backgroundColor: ["#28a745", "#dc3545"]
                         }],
                         labels: ["Remaining", "Used"]
@@ -129,17 +132,19 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                         animation: {
                             onComplete: function(animation) {
                                 var ctx = this.chart.ctx;
-                                var percentage = Math.round((<?= $usage_data['used_volume'] ?> / <?= $usage_data['total_volume'] ?>) * 100);
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
-                                ctx.font = 'bold 20px Arial';
-                                ctx.fillStyle = '#333';
-                                ctx.fillText(percentage + '%', this.chart.width / 2, this.chart.height / 2);
+                                var percentage = ' . $percentage . ';
+                                ctx.textAlign = "center";
+                                ctx.textBaseline = "middle";
+                                ctx.font = "bold 20px Arial";
+                                ctx.fillStyle = "#333";
+                                ctx.fillText(percentage + "%", this.chart.width / 2, this.chart.height / 2);
                             }
                         }
                     }
                 });
                 </script>';
+            } else {
+                echo '<div class="error">خطا در دریافت اطلاعات تلگرام</div>';
             }
         }
 
@@ -162,7 +167,6 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
         $message = '<div class="error">لطفاً یک URL معتبر وارد کنید</div>';
     }
 }
-
 // دریافت تاریخچه تست‌ها
 $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMIT 10');
 ?>
