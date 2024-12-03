@@ -83,7 +83,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
     $url = trim($_POST['subscription_url']);
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
         // اول اطلاعات تلگرام را چک می‌کنیم
-        if (isset($_POST['bot_id'])) {
+        if (isset($_POST['bot_id']) && !empty($_POST['bot_id'])) {
             $cmd = "python3 /var/www/scripts/check_telegram_service.py " . escapeshellarg($_POST['bot_id']);
             $telegram_output = shell_exec($cmd);
             $usage_data = json_decode($telegram_output, true);
@@ -320,7 +320,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                 <input type="url" name="subscription_url" placeholder="Enter Subscription URL" required style="margin-bottom: 10px;">
             </div>
             <div class="form-group">
-                <input type="text" name="bot_id" placeholder="Enter Telegram Bot ID" required style="margin-bottom: 10px;">
+                <input type="text" name="bot_id" placeholder="Enter Telegram Bot ID (Optional)" style="margin-bottom: 10px;">
             </div>
             <button type="submit">Check Configs</button>
         </form>
