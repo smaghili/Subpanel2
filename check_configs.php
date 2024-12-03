@@ -266,10 +266,13 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            width: 100%;
         }
         button:hover {
             background-color: #45a049;
+        }
+        button[type="submit"] {
+            display: block;
+            margin: 0 auto;
         }
     </style>
 </head>
