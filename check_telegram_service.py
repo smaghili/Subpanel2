@@ -24,12 +24,22 @@ async def main():
         # تنظیمات اولیه
         api_id = "23933986"
         api_hash = "f61a82f32627f793c85704c163bf2547"
+        session_file = '/var/www/sessions/telegram_session'
         bot_id = sys.argv[1]
         
         logger.info(f"Starting client with bot_id: {bot_id}")
         
-        # ایجاد کلاینت
-        client = await TelegramClient('session_name', api_id, api_hash).start()
+        # ایجاد کلاینت با استفاده از session موجود
+        client = TelegramClient(session_file, api_id, api_hash)
+        await client.connect()
+        
+        # بررسی وجود session
+        if not await client.is_user_authorized():
+            logger.error("No valid session found")
+            print(json.dumps({"error": "لطفا ابتدا احراز هویت کنید"}))
+            await client.disconnect()
+            return
+            
         logger.info("Client started successfully")
         
         try:

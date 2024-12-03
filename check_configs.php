@@ -302,6 +302,19 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         .stat-box {
             text-align: center;
         }
+        .auth-button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .auth-button:hover {
+            background-color: #006699;
+        }
     </style>
 </head>
 <body>
@@ -323,6 +336,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             </div>
             <div class="form-group">
                 <input type="text" name="bot_id" placeholder="Enter Telegram Bot ID (Optional)" style="margin-bottom: 10px;">
+                <button type="button" onclick="openTelegramAuth()" class="auth-button">احراز هویت تلگرام</button>
             </div>
             <button type="submit">Check Configs</button>
         </form>
@@ -396,6 +410,10 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
     </div>
 
     <script>
+        function openTelegramAuth() {
+            window.open('telegram_auth.php', 'تایید هویت تلگرام', 'width=500,height=600');
+        }
+        
         function showLoading() {
             document.getElementById('loading').style.display = 'block';
         }
