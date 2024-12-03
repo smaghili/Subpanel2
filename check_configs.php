@@ -78,7 +78,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
     $url = trim($_POST['subscription_url']);
     $bot_id = trim($_POST['bot_id']);
     
-    // ذخیره نام بات در فایل
+    // ذخی��ه نام بات در فایل
     file_put_contents('/var/www/config/bot_id.txt', $bot_id);
     
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
@@ -97,7 +97,9 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
 
             // اگر نام بات وارد شده باشد، اطلاعات سرویس را هم چک می‌کنیم
             if (!empty($bot_id)) {
-                $bot_output = shell_exec("python3 /var/www/scripts/monitor-bot.py");
+                $cmd = "python3 /var/www/scripts/monitor-bot.py 2>&1";
+                $bot_output = shell_exec($cmd);
+                error_log("Monitor Bot Output: " . $bot_output);
                 $bot_data = json_decode($bot_output, true);
                 
                 if ($bot_data && !isset($bot_data['error'])) {

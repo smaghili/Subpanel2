@@ -10,7 +10,8 @@ import os
 # تنظیمات اولیه
 api_id = "23933986"
 api_hash = "f61a82f32627f793c85704c163bf2547"
-session_file = 'tel_session'
+session_dir = '/var/www/sessions'
+session_file = os.path.join(session_dir, 'tel_session')
 
 # خواندن نام بات از فایل
 def get_bot_username():

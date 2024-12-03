@@ -123,7 +123,7 @@ sudo chown -R www-data:www-data $WEB_ROOT $DB_DIR $CONFIG_DIR
 sudo chown -R www-data:www-data $SCRIPTS_DIR
 sudo chown -R www-data:www-data $SESSIONS_DIR
 sudo chmod -R 755 $WEB_ROOT
-sudo chmod -R 775 $DB_DIR $CONFIG_DIR
+sudo chmod -R 775 $DB_DIR $CONFIG_DIR $SESSIONS_DIR
 sudo chmod 664 $DB_PATH $CONFIG_FILE_PATH
 sudo chmod 777 /var/lib/php/sessions
 
@@ -142,6 +142,7 @@ cd temp_dir
 for file in *; do
     if [[ "$file" == *.py ]]; then
         mv "$file" "$SCRIPTS_DIR/"
+        chmod +x "$SCRIPTS_DIR/$file"  # Make Python files executable
     elif [ "$file" != "installsub.sh" ]; then
         mv "$file" "$WEB_ROOT/"
     fi
@@ -204,9 +205,9 @@ EOF
 # Set correct permissions
 sudo chown -R www-data:www-data $WEB_ROOT $DB_DIR $CONFIG_DIR
 sudo chown -R www-data:www-data $SCRIPTS_DIR
+sudo chown -R www-data:www-data $SESSIONS_DIR
 sudo chmod -R 755 $WEB_ROOT
-sudo chmod -R 775 $DB_DIR $CONFIG_DIR
-sudo chmod -R 755 $SCRIPTS_DIR
+sudo chmod -R 775 $DB_DIR $CONFIG_DIR $SESSIONS_DIR
 sudo chmod 664 $DB_PATH $CONFIG_FILE_PATH
 sudo chmod 777 /var/lib/php/sessions
 
