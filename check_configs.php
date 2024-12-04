@@ -103,8 +103,20 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                 $bot_data = json_decode($bot_output, true);
                 
                 if ($bot_data && !isset($bot_data['error'])) {
+                    // ذخیره اطلاعات مصرف در دیتابیس
+                    $stmt = $db->prepare('INSERT INTO usage_data (config_id, total_volume, used_volume, days_left) 
+                        SELECT id, :total_volume, :used_volume, :days_left 
+                        FROM config_checks 
+                        WHERE url = :url 
+                        ORDER BY check_date DESC LIMIT 1');
+                    $stmt->bindValue(':url', $url, SQLITE3_TEXT);
+                    $stmt->bindValue(':total_volume', $bot_data['total_volume'], SQLITE3_FLOAT);
+                    $stmt->bindValue(':used_volume', $bot_data['used_volume'], SQLITE3_FLOAT);
+                    $stmt->bindValue(':days_left', $bot_data['days_left'], SQLITE3_INTEGER);
+                    $stmt->execute();
+
                     // محاسبه درصدها
-                    $days_percentage = min(100, ($bot_data['days_left'] / 30) * 100); // فرض 30 روزه
+                    $days_percentage = min(100, ($bot_data['days_left'] / 30) * 100);
                     $volume_percentage = min(100, ($bot_data['used_volume'] / $bot_data['total_volume']) * 100);
                     
                     // اضافه کردن به پیام موفقیت
@@ -129,40 +141,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                                 <span class="progress-text">' . round($volume_percentage) . '%</span>
                             </div>
                         </div>
-                    </div>
-                    <script>
-                    document.addEventListener("DOMContentLoaded", function() {
-                        document.querySelectorAll(".progress-circle").forEach(function(circle) {
-                            var percentage = circle.getAttribute("data-percentage");
-                            var color = percentage < 50 ? "#2ecc71" : percentage < 80 ? "#f1c40f" : "#e74c3c";
-                            var radius = 70;
-                            var circumference = 2 * Math.PI * radius;
-                            var offset = circumference - (percentage / 100) * circumference;
-                            
-                            circle.innerHTML = `
-                                <svg class="progress-ring" width="160" height="160">
-                                    <circle class="progress-ring-circle-bg" 
-                                        stroke="#eee"
-                                        stroke-width="8"
-                                        fill="transparent"
-                                        r="${radius}"
-                                        cx="80"
-                                        cy="80"/>
-                                    <circle class="progress-ring-circle"
-                                        stroke="${color}"
-                                        stroke-width="8"
-                                        fill="transparent"
-                                        r="${radius}"
-                                        cx="80"
-                                        cy="80"
-                                        style="stroke-dasharray: ${circumference} ${circumference}; 
-                                               stroke-dashoffset: ${offset};"/>
-                                </svg>
-                                <span class="progress-text">${Math.round(percentage)}%</span>
-                            `;
-                        });
-                    });
-                    </script>';
+                    </div>';
                 }
             }
         } else {
@@ -400,6 +379,22 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             transform: rotate(-90deg);
             transform-origin: 50% 50%;
         }
+        .mini-progress-circle {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            margin: 0 auto;
+            display: inline-block;
+        }
+        .mini-progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -457,16 +452,34 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                     <th>Total Configs</th>
                     <th>Working Configs</th>
                     <th>Check Date</th>
+                    <th>Usage</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody>
-                <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)): ?>
+                <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)):
+                    // دریافت آخرین اطلاعات مصرف
+                    $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
+                    if ($usage) {
+                        $days_percentage = min(100, ($usage['days_left'] / 30) * 100);
+                        $volume_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
+                    }
+                ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
                     <td><?= $row['total_configs'] ?></td>
                     <td><?= $row['valid_configs'] ?> / <?= $row['total_configs'] ?></td>
                     <td><?= $row['check_date'] ?></td>
+                    <td>
+                        <?php if ($usage): ?>
+                        <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
+                            <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
+                        </div>
+                        <div class="mini-progress-circle" data-percentage="<?= $volume_percentage ?>">
+                            <span class="mini-progress-text"><?= round($volume_percentage) ?>%</span>
+                        </div>
+                        <?php endif; ?>
+                    </td>
                     <td>
                         <form method="POST" style="display: inline;" onsubmit="showLoading()">
                             <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
@@ -483,6 +496,51 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         function showLoading() {
             document.getElementById('loading').style.display = 'block';
         }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // تابع رسم دایره پیشرفت
+            function drawProgressCircle(circle, isMini = false) {
+                var percentage = circle.getAttribute("data-percentage");
+                var color = percentage < 50 ? "#2ecc71" : percentage < 80 ? "#f1c40f" : "#e74c3c";
+                var size = isMini ? 40 : 160;
+                var strokeWidth = isMini ? 3 : 8;
+                var radius = isMini ? 16 : 70;
+                var circumference = 2 * Math.PI * radius;
+                var offset = circumference - (percentage / 100) * circumference;
+                
+                circle.innerHTML = `
+                    <svg class="progress-ring" width="${size}" height="${size}">
+                        <circle class="progress-ring-circle-bg" 
+                            stroke="#eee"
+                            stroke-width="${strokeWidth}"
+                            fill="transparent"
+                            r="${radius}"
+                            cx="${size/2}"
+                            cy="${size/2}"/>
+                        <circle class="progress-ring-circle"
+                            stroke="${color}"
+                            stroke-width="${strokeWidth}"
+                            fill="transparent"
+                            r="${radius}"
+                            cx="${size/2}"
+                            cy="${size/2}"
+                            style="stroke-dasharray: ${circumference} ${circumference}; 
+                                   stroke-dashoffset: ${offset};"/>
+                    </svg>
+                    <span class="${isMini ? 'mini-progress-text' : 'progress-text'}">${Math.round(percentage)}%</span>
+                `;
+            }
+
+            // رسم دایره‌های بزرگ
+            document.querySelectorAll(".progress-circle").forEach(function(circle) {
+                drawProgressCircle(circle, false);
+            });
+
+            // رسم دایره‌های کوچک
+            document.querySelectorAll(".mini-progress-circle").forEach(function(circle) {
+                drawProgressCircle(circle, true);
+            });
+        });
     </script>
 </body>
 </html> 

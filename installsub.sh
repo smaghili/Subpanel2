@@ -109,6 +109,15 @@ if [ ! -f "$DB_PATH" ]; then
         valid_configs INTEGER,
         check_date DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS usage_data (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        config_id INTEGER,
+        total_volume REAL,
+        used_volume REAL,
+        days_left INTEGER,
+        check_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (config_id) REFERENCES config_checks(id)
+    );
     INSERT INTO admin (username, password) VALUES ('admin', 'admin123');
     "
 fi
