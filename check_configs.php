@@ -107,7 +107,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
         $results = checkConfigs($url);
         if ($results['success']) {
             // ذخیره نتایج در دیتابیس
-            $stmt = $db->prepare('INSERT INTO config_checks (name, url, total_configs, valid_configs) VALUES (:name, :url, :total, :valid)');
+            $stmt = $db->prepare('INSERT INTO config_checks (name, url, total_configs, valid_configs, check_date) VALUES (:name, :url, :total, :valid, datetime("now", "localtime"))');
             $stmt->bindValue(':name', $_POST['config_name'], SQLITE3_TEXT);
             $stmt->bindValue(':url', $url, SQLITE3_TEXT);
             $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
@@ -495,10 +495,7 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                 </tr>
             </thead>
             <tbody>
-                <?php
-                $current_time = time();
-                $current_tehran_time = strtotime('+3.5 hours', $current_time); // تنظیم برای تهران
-                while ($row = $history->fetchArray(SQLITE3_ASSOC)):
+                <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)):
                     // دریافت آخرین اطلاعات مصرف
                     $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
                     if ($usage) {
@@ -506,15 +503,18 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                         $volume_used_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
                         $volume_remaining = $usage['total_volume'] - $usage['used_volume'];
                     }
-                    
-                    // تبدیل تاریخ میلادی به شمسی
-                    $timestamp = strtotime($row['check_date']);
-                    $jalali_date = jdate("Y/m/d H:i", $timestamp);
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td style="text-align: center;"><?= $row['valid_configs'] ?> از <?= $row['total_configs'] ?></td>
-                    <td style="text-align: center;"><?= jdate("Y/m/d H:i", $current_tehran_time) ?></td>
+                    <td style="text-align: center;"><?= $row['valid_configs'] . ' از ' . $row['total_configs'] ?></td>
+                    <td style="text-align: center;">
+                    <?php 
+                        $timestamp = strtotime($row['check_date']);
+                        // تنظیم timezone برای تهران
+                        $tehran_timestamp = $timestamp + (3.5 * 3600); // اضافه کردن 3.5 ساعت برای تهران
+                        echo jdate("Y/m/d H:i", $tehran_timestamp);
+                    ?>
+                    </td>
                     <td>
                         <?php if ($usage): ?>
                         <div class="usage-info">
