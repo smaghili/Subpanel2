@@ -20,6 +20,21 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 try {
     $db = new SQLite3('/var/www/db/subscriptions.db');
+    
+    // چک کردن وجود ستون bot_id
+    $result = $db->query("PRAGMA table_info(config_checks)");
+    $has_bot_id = false;
+    while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+        if ($row['name'] === 'bot_id') {
+            $has_bot_id = true;
+            break;
+        }
+    }
+    
+    // اضافه کردن ستون bot_id اگر وجود نداشت
+    if (!$has_bot_id) {
+        $db->exec('ALTER TABLE config_checks ADD COLUMN bot_id TEXT');
+    }
 } catch (Exception $e) {
     die('Database Error: ' . $e->getMessage());
 }
