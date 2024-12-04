@@ -532,16 +532,21 @@ function en2fa($string) {
                     if ($usage) {
                         // محاسبه درصد زمان گذشته از کل دوره
                         $first_date = strtotime($row['first_check_date']);
-                        $expiry_date = strtotime($usage['expiry_date']);
+                        $expiry_date = isset($usage['expiry_date']) && $usage['expiry_date'] ? strtotime($usage['expiry_date']) : 0;
                         $current_time = time();
                         
-                        $total_period = $expiry_date - $first_date;
-                        $elapsed_period = $current_time - $first_date;
-                        
-                        if ($total_period > 0) {
-                            $days_percentage = min(100, ($elapsed_period / $total_period) * 100);
+                        if ($expiry_date > 0) {
+                            $total_period = $expiry_date - $first_date;
+                            $elapsed_period = $current_time - $first_date;
+                            
+                            if ($total_period > 0) {
+                                $days_percentage = min(100, ($elapsed_period / $total_period) * 100);
+                            } else {
+                                $days_percentage = 0;
+                            }
                         } else {
-                            $days_percentage = 0;
+                            // اگر تاریخ انقضا نداریم، از روش قبلی استفاده می‌کنیم
+                            $days_percentage = min(100, ($usage['days_left'] / 30) * 100);
                         }
                         
                         $volume_used_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
