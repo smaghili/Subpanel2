@@ -357,13 +357,12 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             position: relative;
             width: 40px;
             height: 40px;
-            display: inline-block;
-            margin-right: 5px;
+            flex-shrink: 0;
         }
         .usage-text {
-            display: inline-block;
             font-size: 12px;
             color: #666;
+            line-height: 1.4;
         }
         .mini-progress-text {
             position: absolute;
@@ -377,8 +376,13 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         .usage-info {
             display: flex;
             align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .usage-item {
+            display: flex;
+            align-items: center;
             gap: 10px;
-            margin: 5px 0;
         }
     </style>
 </head>
@@ -459,15 +463,15 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                     <td>
                         <?php if ($usage): ?>
                         <div class="usage-info">
-                            <div>
+                            <div class="usage-item">
                                 <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
-                                    <span class="mini-progress-text"><?= round(100 - $days_percentage) ?>%</span>
+                                    <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
                                 </div>
                                 <div class="usage-text">
                                     <?= $usage['days_left'] ?> روز باقیمانده
                                 </div>
                             </div>
-                            <div>
+                            <div class="usage-item">
                                 <div class="mini-progress-circle" data-percentage="<?= $volume_used_percentage ?>">
                                     <span class="mini-progress-text"><?= round($volume_used_percentage) ?>%</span>
                                 </div>
@@ -526,16 +530,11 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                             style="stroke-dasharray: ${circumference} ${circumference}; 
                                    stroke-dashoffset: ${offset};"/>
                     </svg>
-                    <span class="${isMini ? 'mini-progress-text' : 'progress-text'}">${Math.round(percentage)}%</span>
+                    <span class="mini-progress-text">${Math.round(percentage)}%</span>
                 `;
             }
 
-            // رسم دایره‌های بزرگ
-            document.querySelectorAll(".progress-circle").forEach(function(circle) {
-                drawProgressCircle(circle, false);
-            });
-
-            // رسم دایره‌های کوچک
+            // رسم همه دایره‌های کوچک
             document.querySelectorAll(".mini-progress-circle").forEach(function(circle) {
                 drawProgressCircle(circle, true);
             });
