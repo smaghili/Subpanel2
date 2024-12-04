@@ -115,33 +115,7 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                     $stmt->bindValue(':days_left', $bot_data['days_left'], SQLITE3_INTEGER);
                     $stmt->execute();
 
-                    // محاسبه درصدها
-                    $days_percentage = min(100, ($bot_data['days_left'] / 30) * 100);
-                    $volume_percentage = min(100, ($bot_data['used_volume'] / $bot_data['total_volume']) * 100);
-                    
-                    // اضافه کردن به پیام موفقیت
-                    $message .= '
-                    <div class="service-stats">
-                        <div class="stat-box">
-                            <div class="stat-header">زمان باقیمانده شما</div>
-                            <div class="stat-value">' . $bot_data['days_left'] . '</div>
-                            <div class="stat-unit">روز</div>
-                            <div class="progress-circle" data-percentage="' . $days_percentage . '">
-                                <span class="progress-text">' . round($days_percentage) . '%</span>
-                            </div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-header">حجم اولیه شما</div>
-                            <div class="stat-value">' . $bot_data['total_volume'] . '</div>
-                            <div class="stat-unit">گیگابایت</div>
-                            <div class="stat-header">حجم باقیمانده شما</div>
-                            <div class="stat-value">' . ($bot_data['total_volume'] - $bot_data['used_volume']) . '</div>
-                            <div class="stat-unit">گیگابایت</div>
-                            <div class="progress-circle" data-percentage="' . $volume_percentage . '">
-                                <span class="progress-text">' . round($volume_percentage) . '%</span>
-                            </div>
-                        </div>
-                    </div>';
+                    $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
                 }
             }
         } else {
@@ -383,8 +357,13 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             position: relative;
             width: 40px;
             height: 40px;
-            margin: 0 auto;
             display: inline-block;
+            margin-right: 5px;
+        }
+        .usage-text {
+            display: inline-block;
+            font-size: 12px;
+            color: #666;
         }
         .mini-progress-text {
             position: absolute;
@@ -394,6 +373,12 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             font-size: 10px;
             font-weight: bold;
             color: white;
+        }
+        .usage-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
         }
     </style>
 </head>
@@ -462,7 +447,8 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                     $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
                     if ($usage) {
                         $days_percentage = min(100, ($usage['days_left'] / 30) * 100);
-                        $volume_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
+                        $volume_used_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
+                        $volume_remaining = $usage['total_volume'] - $usage['used_volume'];
                     }
                 ?>
                 <tr>
@@ -472,11 +458,24 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                     <td><?= $row['check_date'] ?></td>
                     <td>
                         <?php if ($usage): ?>
-                        <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
-                            <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
-                        </div>
-                        <div class="mini-progress-circle" data-percentage="<?= $volume_percentage ?>">
-                            <span class="mini-progress-text"><?= round($volume_percentage) ?>%</span>
+                        <div class="usage-info">
+                            <div>
+                                <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
+                                    <span class="mini-progress-text"><?= round(100 - $days_percentage) ?>%</span>
+                                </div>
+                                <div class="usage-text">
+                                    <?= $usage['days_left'] ?> روز باقیمانده
+                                </div>
+                            </div>
+                            <div>
+                                <div class="mini-progress-circle" data-percentage="<?= $volume_used_percentage ?>">
+                                    <span class="mini-progress-text"><?= round($volume_used_percentage) ?>%</span>
+                                </div>
+                                <div class="usage-text">
+                                    حجم کل: <?= $usage['total_volume'] ?> GB<br>
+                                    باقیمانده: <?= number_format($volume_remaining, 1) ?> GB
+                                </div>
+                            </div>
                         </div>
                         <?php endif; ?>
                     </td>
