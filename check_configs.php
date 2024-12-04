@@ -57,6 +57,23 @@ function checkConfigs($url) {
 $message = '';
 $results = null;
 
+// بررسی درخواست حذف
+if (isset($_POST['delete_id'])) {
+    $id = (int)$_POST['delete_id'];
+    
+    // حذف از جدول usage_data
+    $stmt = $db->prepare('DELETE FROM usage_data WHERE config_id = :id');
+    $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+    $stmt->execute();
+    
+    // حذف از جدول config_checks
+    $stmt = $db->prepare('DELETE FROM config_checks WHERE id = :id');
+    $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+    $stmt->execute();
+    
+    $message = '<div class="success">مورد با موفقیت حذف شد.</div>';
+}
+
 // بررسی درخواست تست مجدد
 if (isset($_POST['recheck']) && isset($_POST['url'])) {
     $url = $_POST['url'];
@@ -229,10 +246,16 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
             margin-top: 20px;
             border-collapse: collapse;
         }
-        .history-table th, .history-table td {
+        .history-table th {
             padding: 10px;
             border: 1px solid #ddd;
-            text-align: left;
+            text-align: center;
+            background-color: #f8f9fa;
+        }
+        .history-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: right;
         }
         .recheck-btn {
             background-color: #FF9800;
@@ -394,6 +417,23 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
             align-items: center;
             gap: 10px;
         }
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -455,7 +495,10 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                 </tr>
             </thead>
             <tbody>
-                <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)):
+                <?php
+                $current_time = time();
+                $current_tehran_time = strtotime('+3.5 hours', $current_time); // تنظیم برای تهران
+                while ($row = $history->fetchArray(SQLITE3_ASSOC)):
                     // دریافت آخرین اطلاعات مصرف
                     $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
                     if ($usage) {
@@ -470,8 +513,8 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td><?= $row['valid_configs'] ?> از <?= $row['total_configs'] ?></td>
-                    <td><?= jdate("Y/m/d - H:i", strtotime($row['check_date']), '', 'Asia/Tehran') ?></td>
+                    <td style="text-align: center;"><?= $row['valid_configs'] ?> از <?= $row['total_configs'] ?></td>
+                    <td style="text-align: center;"><?= jdate("Y/m/d H:i", $current_tehran_time) ?></td>
                     <td>
                         <?php if ($usage): ?>
                         <div class="usage-info">
@@ -496,10 +539,16 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                         <?php endif; ?>
                     </td>
                     <td>
-                        <form method="POST" style="display: inline;" onsubmit="showLoading()">
-                            <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
-                            <button type="submit" name="recheck" class="recheck-btn">Recheck</button>
-                        </form>
+                        <div class="action-buttons">
+                            <form method="POST" style="display: inline;" onsubmit="return confirm('آیا از حذف این مورد اطمینان دارید؟');">
+                                <input type="hidden" name="delete_id" value="<?= $row['id'] ?>">
+                                <button type="submit" class="delete-btn">حذف</button>
+                            </form>
+                            <form method="POST" style="display: inline;" onsubmit="showLoading()">
+                                <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
+                                <button type="submit" name="recheck" class="recheck-btn">بررسی مجدد</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 <?php endwhile; ?>
