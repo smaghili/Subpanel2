@@ -509,7 +509,7 @@ function en2fa($string) {
 
         <?php if ($results): ?>
         <div class="results">
-            <div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>
+            <div class="success" style="direction: rtl;">تست کانفیگ‌ها با موفقیت انجام شد.</div>
         </div>
         <?php endif; ?>
 
@@ -519,7 +519,7 @@ function en2fa($string) {
                 <tr>
                     <th>نام</th>
                     <th>کانفیگ‌های فعال</th>
-                    <th>تاریخ بررس</th>
+                    <th>تاریخ بررسی</th>
                     <th>مصرف</th>
                     <th>عملیات</th>
                 </tr>
