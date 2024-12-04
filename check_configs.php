@@ -21,19 +21,31 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 try {
     $db = new SQLite3('/var/www/db/subscriptions.db');
     
-    // چک کردن وجود ستون bot_id
+    // چک کردن وجود ستون‌های مورد نیاز
     $result = $db->query("PRAGMA table_info(config_checks)");
     $has_bot_id = false;
+    $has_first_check_date = false;
     while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
         if ($row['name'] === 'bot_id') {
             $has_bot_id = true;
-            break;
+        }
+        if ($row['name'] === 'first_check_date') {
+            $has_first_check_date = true;
         }
     }
     
-    // اضافه کردن ستون bot_id اگر وجود نداشت
+    // اضافه کردن ستون‌های مورد نیاز
     if (!$has_bot_id) {
         $db->exec('ALTER TABLE config_checks ADD COLUMN bot_id TEXT');
+    }
+    if (!$has_first_check_date) {
+        $db->exec('ALTER TABLE config_checks ADD COLUMN first_check_date DATETIME');
+        // آپدیت رکوردهای موجود
+        $db->exec('UPDATE config_checks SET first_check_date = (
+            SELECT MIN(check_date) 
+            FROM config_checks AS c2 
+            WHERE c2.url = config_checks.url
+        )');
     }
 } catch (Exception $e) {
     die('Database Error: ' . $e->getMessage());
@@ -147,7 +159,8 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
         $results = checkConfigs($url);
         if ($results['success']) {
             // ذخیره نتایج در دیتابیس
-            $stmt = $db->prepare('INSERT INTO config_checks (name, url, bot_id, total_configs, valid_configs, check_date) VALUES (:name, :url, :bot_id, :total, :valid, datetime("now", "localtime"))');
+            $stmt = $db->prepare('INSERT INTO config_checks (name, url, bot_id, total_configs, valid_configs, check_date, first_check_date) 
+                VALUES (:name, :url, :bot_id, :total, :valid, datetime("now", "localtime"), datetime("now", "localtime"))');
             $stmt->bindValue(':name', $_POST['config_name'], SQLITE3_TEXT);
             $stmt->bindValue(':url', $url, SQLITE3_TEXT);
             $stmt->bindValue(':bot_id', $_POST['bot_id'], SQLITE3_TEXT);
@@ -517,7 +530,20 @@ function en2fa($string) {
                     // دریافت آخرین اطلاعات مصرف
                     $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
                     if ($usage) {
-                        $days_percentage = min(100, ($usage['days_left'] / 30) * 100);
+                        // محاسبه درصد زمان گذشته از کل دوره
+                        $first_date = strtotime($row['first_check_date']);
+                        $expiry_date = strtotime($usage['expiry_date']);
+                        $current_time = time();
+                        
+                        $total_period = $expiry_date - $first_date;
+                        $elapsed_period = $current_time - $first_date;
+                        
+                        if ($total_period > 0) {
+                            $days_percentage = min(100, ($elapsed_period / $total_period) * 100);
+                        } else {
+                            $days_percentage = 0;
+                        }
+                        
                         $volume_used_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
                         $volume_remaining = $usage['total_volume'] - $usage['used_volume'];
                     }
