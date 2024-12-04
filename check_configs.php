@@ -4,6 +4,10 @@ ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 ini_set('error_log', '/var/log/php_errors.log');
 
+// تنظیم timezone
+date_default_timezone_set('Asia/Tehran');
+ini_set('date.timezone', 'Asia/Tehran');
+
 // افزایش timeout
 set_time_limit(300);
 ini_set('max_execution_time', '300');
@@ -142,7 +146,7 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -152,7 +156,7 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            min-width: 1100px;
+            min-width: 900px;
         }
         h1 { 
             text-align: center; 
@@ -466,8 +470,8 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td><?= $row['valid_configs'] ?></td>
-                    <td><?= $jalali_date ?></td>
+                    <td><?= $row['valid_configs'] ?> از <?= $row['total_configs'] ?></td>
+                    <td><?= jdate("Y/m/d - H:i", strtotime($row['check_date']), '', 'Asia/Tehran') ?></td>
                     <td>
                         <?php if ($usage): ?>
                         <div class="usage-info">
