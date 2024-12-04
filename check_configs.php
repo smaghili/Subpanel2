@@ -138,7 +138,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -148,6 +148,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            min-width: 1100px;
         }
         h1 { 
             text-align: center; 
@@ -363,6 +364,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             font-size: 12px;
             color: #666;
             line-height: 1.4;
+            white-space: nowrap;
         }
         .mini-progress-text {
             position: absolute;
@@ -371,7 +373,7 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
             transform: translate(-50%, -50%);
             font-size: 10px;
             font-weight: bold;
-            color: white;
+            color: #000;
         }
         .usage-info {
             display: flex;
