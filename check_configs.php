@@ -127,6 +127,10 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
 }
 // دریافت تاریخچه تست‌ها
 $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMIT 10');
+
+// در ابتدای فایل بعد از error_reporting
+date_default_timezone_set('Asia/Tehran');
+require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
 ?>
 
 <!DOCTYPE html>
@@ -439,12 +443,11 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
         <table class="history-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Total Configs</th>
-                    <th>Working Configs</th>
-                    <th>Check Date</th>
-                    <th>Usage</th>
-                    <th>Action</th>
+                    <th>نام</th>
+                    <th>کانفیگ‌های فعال</th>
+                    <th>تاریخ بررسی</th>
+                    <th>مصرف</th>
+                    <th>عملیات</th>
                 </tr>
             </thead>
             <tbody>
@@ -456,12 +459,15 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                         $volume_used_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
                         $volume_remaining = $usage['total_volume'] - $usage['used_volume'];
                     }
+                    
+                    // تبدیل تاریخ میلادی به شمسی
+                    $timestamp = strtotime($row['check_date']);
+                    $jalali_date = jdate("Y/m/d H:i", $timestamp);
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td><?= $row['total_configs'] ?></td>
-                    <td><?= $row['valid_configs'] ?> / <?= $row['total_configs'] ?></td>
-                    <td><?= $row['check_date'] ?></td>
+                    <td><?= $row['valid_configs'] ?></td>
+                    <td><?= $jalali_date ?></td>
                     <td>
                         <?php if ($usage): ?>
                         <div class="usage-info">
@@ -478,8 +484,8 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
                                     <span class="mini-progress-text"><?= round($volume_used_percentage) ?>%</span>
                                 </div>
                                 <div class="usage-text">
-                                    حجم کل: <?= $usage['total_volume'] ?> GB<br>
-                                    باقیمانده: <?= number_format($volume_remaining, 1) ?> GB
+                                    حجم کل: <?= $usage['total_volume'] ?> گیگابایت<br>
+                                    باقیمانده: <?= number_format($volume_remaining, 1) ?> گیگابایت
                                 </div>
                             </div>
                         </div>
