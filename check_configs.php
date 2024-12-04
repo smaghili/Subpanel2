@@ -152,6 +152,13 @@ $history = $db->query('SELECT * FROM config_checks ORDER BY check_date DESC LIMI
 // در ابتدای فایل بعد از error_reporting
 date_default_timezone_set('Asia/Tehran');
 require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
+
+// تابع تبدیل اعداد انگلیسی به فارسی
+function en2fa($string) {
+    $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', '.'];
+    $english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'];
+    return str_replace($english, $persian, $string);
+}
 ?>
 
 <!DOCTYPE html>
@@ -506,13 +513,12 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td style="text-align: center;"><?= $row['valid_configs'] . ' از ' . $row['total_configs'] ?></td>
+                    <td style="text-align: center;"><?= en2fa($row['valid_configs'] . ' از ' . $row['total_configs']) ?></td>
                     <td style="text-align: center;">
                     <?php 
                         $timestamp = strtotime($row['check_date']);
-                        // تنظیم timezone برای تهران
-                        $tehran_timestamp = $timestamp + (3.5 * 3600); // اضافه کردن 3.5 ساعت برای تهران
-                        echo jdate("Y/m/d H:i", $tehran_timestamp);
+                        $tehran_timestamp = $timestamp + (3.5 * 3600);
+                        echo en2fa(jdate("Y/m/d H:i", $tehran_timestamp));
                     ?>
                     </td>
                     <td>
@@ -523,7 +529,7 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                                     <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
                                 </div>
                                 <div class="usage-text">
-                                    <?= $usage['days_left'] ?> روز باقیمانده
+                                    <?= en2fa($usage['days_left']) ?> روز باقیمانده
                                 </div>
                             </div>
                             <div class="usage-item">
@@ -531,8 +537,8 @@ require_once 'jdf.php';  // برای تبدیل تاریخ به شمسی
                                     <span class="mini-progress-text"><?= round($volume_used_percentage) ?>%</span>
                                 </div>
                                 <div class="usage-text">
-                                    حجم کل: <?= $usage['total_volume'] ?> گیگابایت<br>
-                                    باقیمانده: <?= number_format($volume_remaining, 1) ?> گیگابایت
+                                    حجم کل: <?= en2fa($usage['total_volume']) ?> گیگابایت<br>
+                                    باقیمانده: <?= en2fa(number_format($volume_remaining, 1)) ?> گیگابایت
                                 </div>
                             </div>
                         </div>
