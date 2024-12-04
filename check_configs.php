@@ -513,14 +513,14 @@ function en2fa($string) {
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td style="text-align: center;">
+                    <td style="text-align: center; direction: rtl;">
                     <?php
                         $valid = en2fa($row['valid_configs']);
                         $total = en2fa($row['total_configs']);
                         echo "{$valid} از {$total}";
                     ?>
                     </td>
-                    <td style="text-align: center;">
+                    <td style="text-align: center; direction: rtl;">
                     <?php 
                         $timestamp = strtotime($row['check_date']);
                         $tehran_timestamp = $timestamp + (3.5 * 3600);
@@ -530,7 +530,7 @@ function en2fa($string) {
                     <td>
                         <?php if ($usage): ?>
                         <div class="usage-info">
-                            <div class="usage-item">
+                            <div class="usage-item" style="direction: rtl;">
                                 <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
                                     <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
                                 </div>
