@@ -212,6 +212,42 @@ function en2fa($string) {
     $english = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'];
     return str_replace($english, $persian, $string);
 }
+
+// Add settings table if not exists
+$db->exec('CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_interval INTEGER DEFAULT 6,
+    last_check DATETIME
+)');
+
+// Insert default value if not exists
+$db->exec('INSERT OR IGNORE INTO settings (id, check_interval, last_check) VALUES (1, 6, datetime("now"))');
+
+// Handle auto-check settings
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['check_interval'])) {
+    $interval = intval($_POST['check_interval']);
+    if ($interval >= 1) {
+        $stmt = $db->prepare('UPDATE settings SET check_interval = :interval WHERE id = 1');
+        $stmt->bindValue(':interval', $interval, SQLITE3_INTEGER);
+        $stmt->execute();
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?settings_saved=1');
+        exit;
+    }
+}
+
+// Get current settings
+$settings = $db->querySingle('SELECT * FROM settings WHERE id = 1', true);
+
+// Handle interval update
+if (isset($_POST['check_interval'])) {
+    $interval = intval($_POST['check_interval']);
+    if ($interval >= 1 && $interval <= 24) {
+        // Update cron job
+        $output = shell_exec("/var/www/html/auto_check.sh set " . escapeshellarg($interval));
+        $success_message = "Auto-check interval updated successfully";
+    }
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -477,6 +513,42 @@ function en2fa($string) {
             gap: 5px;
             justify-content: center;
         }
+        .settings-form {
+            margin-bottom: 1rem;
+        }
+        .settings-form .form-group {
+            margin-bottom: 0.5rem;
+        }
+        .settings-form label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        .alert {
+            padding: 0.75rem 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid transparent;
+            border-radius: 0.25rem;
+        }
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .interval-form {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .interval-form label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .interval-form input[type="number"] {
+            width: 100px;
+            padding: 5px;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -512,6 +584,37 @@ function en2fa($string) {
             <div class="success" style="direction: rtl;">تست کانفیگ‌ها با موفقیت انجام شد.</div>
         </div>
         <?php endif; ?>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>تنظیمات بررسی خودکار</h3>
+            </div>
+            <div class="card-body">
+                <?php if (isset($_GET['settings_saved'])): ?>
+                <div class="alert alert-success">تنظیمات با موفقیت ذخیره شد</div>
+                <?php endif; ?>
+
+                <form method="POST" class="settings-form">
+                    <div class="form-group">
+                        <label for="check_interval">فاصله زمانی بررسی خودکار (ساعت):</label>
+                        <div class="input-group" style="max-width: 200px;">
+                            <input type="number" id="check_interval" name="check_interval" 
+                                   value="<?php echo $settings['check_interval']; ?>" 
+                                   min="1" required class="form-control">
+                            <div class="input-group-append">
+                                <button type="submit" class="btn btn-primary">ذخیره</button>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">
+                            حداقل زمان مجاز 1 ساعت است
+                            <?php if ($settings['last_check']): ?>
+                            <br>آخرین بررسی: <?php echo $settings['last_check']; ?>
+                            <?php endif; ?>
+                        </small>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <h2>Recent Checks</h2>
         <table class="history-table">
