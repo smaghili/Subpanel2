@@ -104,13 +104,6 @@ if (isset($_POST['delete_id'])) {
 // بررسی درخواست تست مجدد
 if (isset($_POST['recheck']) && isset($_POST['url'])) {
     $url = $_POST['url'];
-    // دریافت bot_id از دیتابیس
-    $bot_id = $db->querySingle("SELECT bot_id FROM config_checks WHERE url = '" . SQLite3::escapeString($url) . "' ORDER BY check_date DESC LIMIT 1");
-    if ($bot_id) {
-        // ذخیره bot_id در فایل برای استفاده مانیتور بات
-        file_put_contents('/var/www/config/bot_id.txt', $bot_id);
-    }
-    
     $results = checkConfigs($url);
     if ($results['success']) {
         // بروزرسانی رکورد موجود
@@ -125,14 +118,13 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
         $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
         $stmt->execute();
 
-        // اجرای مانیتور بات و بروزرسانی اطلاعات مصرف
+        // اجرای مانیتور بات
         $config_id = $db->querySingle("SELECT id FROM config_checks WHERE url = '" . SQLite3::escapeString($url) . "' ORDER BY check_date DESC LIMIT 1");
         if ($config_id) {
             $bot_output = shell_exec("python3 /var/www/scripts/monitor-bot.py");
             $bot_data = json_decode($bot_output, true);
             
             if ($bot_data && !isset($bot_data['error'])) {
-                // ذخیره اطلاعات مصرف جدید
                 $stmt = $db->prepare('INSERT INTO usage_data (config_id, total_volume, used_volume, days_left) 
                     VALUES (:config_id, :total_volume, :used_volume, :days_left)');
                 $stmt->bindValue(':config_id', $config_id, SQLITE3_INTEGER);
@@ -142,10 +134,17 @@ if (isset($_POST['recheck']) && isset($_POST['url'])) {
                 $stmt->execute();
             }
         }
-        
-        $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
     }
+    header('Location: ' . $_SERVER['PHP_SELF'] . '?success=1');
+    exit;
 }
+
+// نمایش پیام موفقیت فقط در بالای صفحه
+$message = '';
+if (isset($_GET['success'])) {
+    $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
+}
+
 // بررسی اولیه URL
 elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'])) {
     $url = trim($_POST['subscription_url']);
@@ -520,91 +519,82 @@ function en2fa($string) {
                 <tr>
                     <th>نام</th>
                     <th>کانفیگ‌های فعال</th>
-                    <th>تاریخ بررسی</th>
+                    <th>تاریخ بررس</th>
                     <th>مصرف</th>
                     <th>عملیات</th>
                 </tr>
             </thead>
             <tbody>
                 <?php while ($row = $history->fetchArray(SQLITE3_ASSOC)):
-                    // دریافت آخرین اطلاعات مصرف
                     $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
+                    $first_check = $db->querySingle("SELECT check_date FROM config_checks WHERE url = '" . SQLite3::escapeString($row['url']) . "' ORDER BY check_date ASC LIMIT 1");
+                    
                     if ($usage) {
-                        // محاسبه درصد زمان گذشته از کل دوره
-                        $first_date = strtotime($row['first_check_date']);
-                        $expiry_date = isset($usage['expiry_date']) && $usage['expiry_date'] ? strtotime($usage['expiry_date']) : 0;
-                        $current_time = time();
+                        // محاسبه درصد روزهای باقیمانده
+                        $start_date = new DateTime($first_check);
+                        $current_date = new DateTime();
+                        $total_days = $usage['days_left']; // کل روزهای باقیمانده از زمان اولین چک
                         
-                        if ($expiry_date > 0) {
-                            $total_period = $expiry_date - $first_date;
-                            $elapsed_period = $current_time - $first_date;
-                            
-                            if ($total_period > 0) {
-                                $days_percentage = min(100, ($elapsed_period / $total_period) * 100);
-                            } else {
-                                $days_percentage = 0;
-                            }
-                        } else {
-                            // اگر تاریخ انقضا نداریم، از روش قبلی استفاده می‌کنیم
-                            $days_percentage = min(100, ($usage['days_left'] / 30) * 100);
-                        }
+                        $days_passed = $current_date->diff($start_date)->days;
+                        $days_percentage = 100 - (($usage['days_left'] / $total_days) * 100);
                         
-                        $volume_used_percentage = min(100, ($usage['used_volume'] / $usage['total_volume']) * 100);
+                        // محاسبه درصد حجم مصرفی (بدون تغییر)
+                        $volume_used_percentage = ($usage['used_volume'] / $usage['total_volume']) * 100;
                         $volume_remaining = $usage['total_volume'] - $usage['used_volume'];
+                    ?>
+                    <tr>
+                        <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
+                        <td style="text-align: center; direction: rtl;">
+                        <?php
+                            $valid = en2fa($row['valid_configs']);
+                            $total = en2fa($row['total_configs']);
+                            echo "{$valid} از {$total}";
+                        ?>
+                        </td>
+                        <td style="text-align: center; direction: rtl;">
+                        <?php 
+                            $timestamp = strtotime($row['check_date']);
+                            $tehran_timestamp = $timestamp + (3.5 * 3600);
+                            echo en2fa(jdate("Y/m/d H:i", $tehran_timestamp));
+                        ?>
+                        </td>
+                        <td>
+                            <div class="usage-info">
+                                <div class="usage-item" style="direction: rtl;">
+                                    <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
+                                        <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
+                                    </div>
+                                    <div class="usage-text">
+                                        <?= en2fa($usage['days_left']) ?> روز باقیمانده
+                                    </div>
+                                </div>
+                                <div class="usage-item">
+                                    <div class="mini-progress-circle" data-percentage="<?= $volume_used_percentage ?>">
+                                        <span class="mini-progress-text"><?= round($volume_used_percentage) ?>%</span>
+                                    </div>
+                                    <div class="usage-text">
+                                        حجم کل: <?= en2fa($usage['total_volume']) ?> گیگابایت<br>
+                                        باقیمانده: <?= en2fa(number_format($volume_remaining, 1)) ?> گیگابایت
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <form method="POST" style="display: inline;" onsubmit="return confirm('آیا از حذف این مورد اطمینان دارید؟');">
+                                    <input type="hidden" name="delete_id" value="<?= $row['id'] ?>">
+                                    <button type="submit" class="delete-btn">حذف</button>
+                                </form>
+                                <form method="POST" style="display: inline;" onsubmit="showLoading()">
+                                    <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
+                                    <button type="submit" name="recheck" class="recheck-btn">بررسی مجدد</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php
                     }
                 ?>
-                <tr>
-                    <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td style="text-align: center; direction: rtl;">
-                    <?php
-                        $valid = en2fa($row['valid_configs']);
-                        $total = en2fa($row['total_configs']);
-                        echo "{$valid} از {$total}";
-                    ?>
-                    </td>
-                    <td style="text-align: center; direction: rtl;">
-                    <?php 
-                        $timestamp = strtotime($row['check_date']);
-                        $tehran_timestamp = $timestamp + (3.5 * 3600);
-                        echo en2fa(jdate("Y/m/d H:i", $tehran_timestamp));
-                    ?>
-                    </td>
-                    <td>
-                        <?php if ($usage): ?>
-                        <div class="usage-info">
-                            <div class="usage-item" style="direction: rtl;">
-                                <div class="mini-progress-circle" data-percentage="<?= $days_percentage ?>">
-                                    <span class="mini-progress-text"><?= round($days_percentage) ?>%</span>
-                                </div>
-                                <div class="usage-text">
-                                    <?= en2fa($usage['days_left']) ?> روز باقیمانده
-                                </div>
-                            </div>
-                            <div class="usage-item">
-                                <div class="mini-progress-circle" data-percentage="<?= $volume_used_percentage ?>">
-                                    <span class="mini-progress-text"><?= round($volume_used_percentage) ?>%</span>
-                                </div>
-                                <div class="usage-text">
-                                    حجم کل: <?= en2fa($usage['total_volume']) ?> گیگابایت<br>
-                                    باقیمانده: <?= en2fa(number_format($volume_remaining, 1)) ?> گیگابایت
-                                </div>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <div class="action-buttons">
-                            <form method="POST" style="display: inline;" onsubmit="return confirm('آیا از حذف این مورد اطمینان دارید؟');">
-                                <input type="hidden" name="delete_id" value="<?= $row['id'] ?>">
-                                <button type="submit" class="delete-btn">حذف</button>
-                            </form>
-                            <form method="POST" style="display: inline;" onsubmit="showLoading()">
-                                <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
-                                <button type="submit" name="recheck" class="recheck-btn">بررسی مجدد</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
                 <?php endwhile; ?>
             </tbody>
         </table>
