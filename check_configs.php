@@ -513,7 +513,13 @@ function en2fa($string) {
                 ?>
                 <tr>
                     <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
-                    <td style="text-align: center;"><?= en2fa($row['valid_configs'] . ' از ' . $row['total_configs']) ?></td>
+                    <td style="text-align: center;">
+                    <?php
+                        $valid = en2fa($row['valid_configs']);
+                        $total = en2fa($row['total_configs']);
+                        echo "{$valid} از {$total}";
+                    ?>
+                    </td>
                     <td style="text-align: center;">
                     <?php 
                         $timestamp = strtotime($row['check_date']);
