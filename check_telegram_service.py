@@ -8,8 +8,10 @@ import sys
 import json
 import logging
 from logging.handlers import RotatingFileHandler
+import time
+from functools import wraps
 
-# تنظیمات امن‌تر برای لاگینگ
+# Secure logging configuration
 log_file = '/var/www/logs/telegram_service.log'
 os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
@@ -18,10 +20,32 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # تغییر سطح لاگ به INFO
+logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-# خواندن کردنشیال‌ها از فایل محیطی
+# Rate Limiting settings
+RATE_LIMIT = 1  # Minimum interval between requests (seconds)
+last_request_time = 0
+
+def rate_limit():
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            global last_request_time
+            current_time = time.time()
+            
+            # Check time elapsed since last request
+            time_passed = current_time - last_request_time
+            if time_passed < RATE_LIMIT:
+                wait_time = RATE_LIMIT - time_passed
+                await asyncio.sleep(wait_time)
+            
+            last_request_time = time.time()
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+# Read credentials from environment file
 def get_credentials():
     try:
         with open('/var/www/config/.env', 'r') as f:
@@ -31,65 +55,91 @@ def get_credentials():
         logger.error("Error reading credentials", exc_info=False)
         return None, None
 
+@rate_limit()
+async def send_command(client, bot_id):
+    try:
+        async with asyncio.timeout(10):  # 10 seconds timeout
+            await client.send_message(bot_id, '/services')
+            await asyncio.sleep(1)
+            return True
+    except asyncio.TimeoutError:
+        logger.error("Timeout while sending command")
+        return False
+    except Exception as e:
+        logger.error("Error sending command", exc_info=False)
+        return False
+
+@rate_limit()
+async def get_bot_message(client, bot_id):
+    try:
+        async with asyncio.timeout(10):
+            message = await client.get_messages(bot_id, limit=1)
+            return message
+    except asyncio.TimeoutError:
+        logger.error("Timeout while getting message")
+        return None
+    except Exception as e:
+        logger.error("Error getting message", exc_info=False)
+        return None
+
 async def main():
     try:
         if len(sys.argv) <= 1:
             logger.error("Bot ID not provided")
-            print(json.dumps({"error": "شناسه ربات وارد نشده است"}))
+            print(json.dumps({"error": "Bot ID is required"}))
             return
 
-        # دریافت کردنشیال‌ها به صورت امن
         api_id, api_hash = get_credentials()
         if not api_id or not api_hash:
-            print(json.dumps({"error": "خطا در خواندن تنظیمات"}))
+            print(json.dumps({"error": "Failed to read configuration"}))
             return
 
         session_file = '/var/www/sessions/telegram_session'
         bot_id = sys.argv[1]
 
-        # بررسی امنیتی ورودی
+        # Security validation for input
         if not bot_id.isalnum():
             logger.warning("Invalid bot ID format")
-            print(json.dumps({"error": "فرمت شناسه ربات نامعتبر است"}))
+            print(json.dumps({"error": "Invalid bot ID format"}))
             return
         
-        logger.info("Starting client")
-        
-        # تنظیم دسترسی‌های فایل سشن
         if os.path.exists(session_file):
             os.chmod(session_file, 0o600)
         
-        client = TelegramClient(session_file, api_id, api_hash)
-        await client.connect()
-        
-        if not await client.is_user_authorized():
-            logger.error("No valid session found")
-            print(json.dumps({"error": "نشست معتبر یافت نشد"}))
-            await client.disconnect()
-            return
-            
-        try:
-            await client.send_message(bot_id, '/services')
-            await asyncio.sleep(1)
-            
-            message = await client.get_messages(bot_id, limit=1)
-            
-            if message and message[0].reply_markup:
-                await message[0].click(0, 0)
-                await asyncio.sleep(1)
+        async with TelegramClient(session_file, api_id, api_hash) as client:
+            if not await client.is_user_authorized():
+                logger.error("No valid session found")
+                print(json.dumps({"error": "No valid session found"}))
+                return
                 
-                response = await client.get_messages(bot_id, limit=1)
+            try:
+                if not await send_command(client, bot_id):
+                    print(json.dumps({"error": "Failed to send command"}))
+                    return
                 
-                if response and response[0].text:
+                message = await get_bot_message(client, bot_id)
+                if not message or not message[0].reply_markup:
+                    print(json.dumps({"error": "Bot menu not available"}))
+                    return
+
+                async with asyncio.timeout(10):
+                    await message[0].click(0, 0)
+                    await asyncio.sleep(1)
+                    
+                    response = await get_bot_message(client, bot_id)
+                    if not response or not response[0].text:
+                        print(json.dumps({"error": "No response received from bot"}))
+                        return
+
                     text = response[0].text
                     
-                    # استخراج اطلاعات با validation
+                    # Extract and validate information
                     total_volume = re.search(r'📦 حجم سرویس : (\d+(?:\.\d+)?)', text)
                     used_volume = re.search(r'📥 حجم مصرفی سرویس : (\d+(?:\.\d+)?)', text)
                     expiry_date = re.search(r'📆 تاریخ انقضای سرویس : (\d{4}/\d{2}/\d{2})', text)
                     
                     if not all([total_volume, used_volume]):
-                        raise ValueError("مقادیر حجم یافت نشد")
+                        raise ValueError("Volume values not found")
                     
                     result = {
                         'total_volume': float(total_volume.group(1)),
@@ -97,29 +147,24 @@ async def main():
                         'expiry_date': expiry_date.group(1) if expiry_date else ''
                     }
                     
-                    # اعتبارسنجی مقادیر
                     if result['total_volume'] < 0 or result['used_volume'] < 0:
-                        raise ValueError("مقادیر حجم نامعتبر")
+                        raise ValueError("Invalid volume values")
                     
                     print(json.dumps(result))
-                else:
-                    print(json.dumps({"error": "پاسخی از ربات دریافت نشد"}))
-            else:
-                print(json.dumps({"error": "منوی ربات در دسترس نیست"}))
-    
-        except ValueError as ve:
-            logger.error(f"Validation error: {str(ve)}")
-            print(json.dumps({"error": str(ve)}))
-        except Exception as e:
-            logger.error("Operation error", exc_info=False)
-            print(json.dumps({"error": "خطا در عملیات"}))
-        
-        finally:
-            await client.disconnect()
+
+            except asyncio.TimeoutError:
+                logger.error("Operation timeout")
+                print(json.dumps({"error": "Operation timeout"}))
+            except ValueError as ve:
+                logger.error(f"Validation error: {str(ve)}")
+                print(json.dumps({"error": str(ve)}))
+            except Exception as e:
+                logger.error("Operation error", exc_info=False)
+                print(json.dumps({"error": "Operation failed"}))
     
     except Exception as e:
         logger.error("Critical error", exc_info=False)
-        print(json.dumps({"error": "خطای سیستمی"}))
+        print(json.dumps({"error": "System error"}))
 
 if __name__ == "__main__":
     asyncio.run(main()) 
