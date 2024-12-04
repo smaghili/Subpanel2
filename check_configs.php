@@ -256,6 +256,26 @@ if (isset($_POST['check_interval'])) {
     <meta charset="UTF-8">
     <title>Check Subscription Configs</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    function openAutoCheckDialog() {
+        document.getElementById('autoCheckDialog').style.display = 'block';
+    }
+
+    function closeAutoCheckDialog() {
+        document.getElementById('autoCheckDialog').style.display = 'none';
+    }
+
+    function saveInterval() {
+        const interval = document.getElementById('check_interval').value;
+        if (interval < 1 || interval > 24) {
+            alert('Please enter a number between 1 and 24');
+            return;
+        }
+        
+        const form = document.getElementById('intervalForm');
+        form.submit();
+    }
+    </script>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -549,14 +569,58 @@ if (isset($_POST['check_interval'])) {
             padding: 5px;
             margin-right: 10px;
         }
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1001;
+            width: 300px;
+        }
+
+        .dialog h3 {
+            margin-top: 0;
+        }
+
+        .dialog-buttons {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .dialog-buttons button {
+            margin-left: 10px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Check Subscription Configs</h1>
         
-        <div style="text-align: right; margin-bottom: 20px;">
-            <button class="back-button" onclick="window.location.href='index.php'">Back to Dashboard</button>
+        <div class="action-buttons">
+            <a href="index.php" class="btn">Back</a>
+            <button onclick="openAutoCheckDialog()" class="btn">Auto-Check Settings</button>
         </div>
 
         <?= $message ?>
@@ -701,6 +765,24 @@ if (isset($_POST['check_interval'])) {
                 <?php endwhile; ?>
             </tbody>
         </table>
+    </div>
+
+    <div id="autoCheckDialog" class="dialog-overlay">
+        <div class="dialog">
+            <h3>Auto-Check Settings</h3>
+            <form id="intervalForm" method="POST">
+                <div class="form-group">
+                    <label for="check_interval">Check Interval (hours):</label>
+                    <input type="number" id="check_interval" name="check_interval" 
+                           min="1" max="24" required class="form-control">
+                    <small class="form-text text-muted">Enter a number between 1 and 24 hours</small>
+                </div>
+                <div class="dialog-buttons">
+                    <button type="button" class="btn" onclick="closeAutoCheckDialog()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveInterval()">Save</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
