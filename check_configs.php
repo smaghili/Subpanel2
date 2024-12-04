@@ -77,19 +77,44 @@ if (isset($_POST['delete_id'])) {
 // بررسی درخواست تست مجدد
 if (isset($_POST['recheck']) && isset($_POST['url'])) {
     $url = $_POST['url'];
+    // دریافت bot_id از دیتابیس
+    $bot_id = $db->querySingle("SELECT bot_id FROM config_checks WHERE url = '" . SQLite3::escapeString($url) . "' ORDER BY check_date DESC LIMIT 1");
+    if ($bot_id) {
+        // ذخیره bot_id در فایل برای استفاده مانیتور بات
+        file_put_contents('/var/www/config/bot_id.txt', $bot_id);
+    }
+    
     $results = checkConfigs($url);
     if ($results['success']) {
         // بروزرسانی رکورد موجود
         $stmt = $db->prepare('UPDATE config_checks SET 
             total_configs = :total,
             valid_configs = :valid,
-            check_date = CURRENT_TIMESTAMP
+            check_date = datetime("now", "localtime")
             WHERE url = :url
             ORDER BY check_date DESC LIMIT 1');
         $stmt->bindValue(':url', $url, SQLITE3_TEXT);
         $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
         $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
         $stmt->execute();
+
+        // اجرای مانیتور بات و بروزرسانی اطلاعات مصرف
+        $config_id = $db->querySingle("SELECT id FROM config_checks WHERE url = '" . SQLite3::escapeString($url) . "' ORDER BY check_date DESC LIMIT 1");
+        if ($config_id) {
+            $bot_output = shell_exec("python3 /var/www/scripts/monitor-bot.py");
+            $bot_data = json_decode($bot_output, true);
+            
+            if ($bot_data && !isset($bot_data['error'])) {
+                // ذخیره اطلاعات مصرف جدید
+                $stmt = $db->prepare('INSERT INTO usage_data (config_id, total_volume, used_volume, days_left) 
+                    VALUES (:config_id, :total_volume, :used_volume, :days_left)');
+                $stmt->bindValue(':config_id', $config_id, SQLITE3_INTEGER);
+                $stmt->bindValue(':total_volume', $bot_data['total_volume'], SQLITE3_FLOAT);
+                $stmt->bindValue(':used_volume', $bot_data['used_volume'], SQLITE3_FLOAT);
+                $stmt->bindValue(':days_left', $bot_data['days_left'], SQLITE3_INTEGER);
+                $stmt->execute();
+            }
+        }
         
         $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
     }
@@ -107,9 +132,10 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
         $results = checkConfigs($url);
         if ($results['success']) {
             // ذخیره نتایج در دیتابیس
-            $stmt = $db->prepare('INSERT INTO config_checks (name, url, total_configs, valid_configs, check_date) VALUES (:name, :url, :total, :valid, datetime("now", "localtime"))');
+            $stmt = $db->prepare('INSERT INTO config_checks (name, url, bot_id, total_configs, valid_configs, check_date) VALUES (:name, :url, :bot_id, :total, :valid, datetime("now", "localtime"))');
             $stmt->bindValue(':name', $_POST['config_name'], SQLITE3_TEXT);
             $stmt->bindValue(':url', $url, SQLITE3_TEXT);
+            $stmt->bindValue(':bot_id', $_POST['bot_id'], SQLITE3_TEXT);
             $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
             $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
             $stmt->execute();
@@ -213,15 +239,6 @@ function en2fa($string) {
             border: 1px solid #ddd;
             border-radius: 4px;
         }
-        .stat {
-            display: flex;
-            align-items: center;
-            margin: 10px 0;
-        }
-        .stat-label {
-            width: 150px;
-            font-weight: bold;
-        }
         .success {
             color: #4CAF50;
             padding: 10px;
@@ -235,14 +252,6 @@ function en2fa($string) {
             margin: 10px 0;
             border-radius: 4px;
             background-color: #ffebee;
-        }
-        .valid-icon {
-            color: #4CAF50;
-            margin-right: 10px;
-        }
-        .invalid-icon {
-            color: #f44336;
-            margin-right: 10px;
         }
         .back-button {
             background-color: #2196F3;
@@ -473,20 +482,7 @@ function en2fa($string) {
 
         <?php if ($results): ?>
         <div class="results">
-            <div class="stat">
-                <span class="stat-label">Total Configs:</span>
-                <span><?= $results['total'] ?></span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Working Configs:</span>
-                <span class="valid-icon">✓</span>
-                <span><?= $results['valid'] ?></span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Not Working Configs:</span>
-                <span class="invalid-icon">✗</span>
-                <span><?= $results['invalid'] ?></span>
-            </div>
+            <div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>
         </div>
         <?php endif; ?>
 

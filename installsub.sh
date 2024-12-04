@@ -105,6 +105,7 @@ if [ ! -f "$DB_PATH" ]; then
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         url TEXT NOT NULL,
+        bot_id TEXT,
         total_configs INTEGER,
         valid_configs INTEGER,
         check_date DATETIME DEFAULT CURRENT_TIMESTAMP
