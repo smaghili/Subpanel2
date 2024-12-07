@@ -46,7 +46,38 @@ COUNTRY_EMOJIS = {
     "UAE": "🇦🇪",
     "Türkiye": "🇹🇷",
     "Mexico": "🇲🇽",
-    "Austria": "🇦🇹",  
+    "Austria": "🇦🇹",
+    "Bulgaria": "🇧🇬",
+    "Romania": "🇷🇴",
+    "Greece": "🇬🇷",
+    "Croatia": "🇭🇷",
+    "Serbia": "🇷🇸",
+    "Slovenia": "🇸🇮",
+    "Slovakia": "🇸🇰",
+    "Czech Republic": "🇨🇿",
+    "Hungary": "🇭🇺",
+    "Switzerland": "🇨🇭",
+    "Portugal": "🇵🇹",
+    "Ireland": "🇮🇪",
+    "Iceland": "🇮🇸",
+    "Estonia": "🇪🇪",
+    "Lithuania": "🇱🇹",
+    "Ukraine": "🇺🇦",
+    "Moldova": "🇲🇩",
+    "Belarus": "🇧🇾",
+    "Georgia": "🇬🇪",
+    "Armenia": "🇦🇲",
+    "Azerbaijan": "🇦🇿",
+    "Kazakhstan": "🇰🇿",
+    "Uzbekistan": "🇺🇿",
+    "Kyrgyzstan": "🇰🇬",
+    "Tajikistan": "🇹🇯",
+    "Turkmenistan": "🇹🇲",
+    "Afghanistan": "🇦🇫",
+    "Pakistan": "🇵🇰",
+    "Bangladesh": "🇧🇩",
+    "Nepal": "🇳🇵",
+    "Sri Lanka": "🇱🇰",
     "Unknown": "🌍"
 }
 
@@ -485,7 +516,7 @@ def generate_hamshahri_name(config: str, protocol_type: str, network_type: str, 
     Generate a new name for config in format: Hamshahri-<NETWORK>-<FLAG>-<NUMBER>
     """
     # Get country emoji
-    emoji = COUNTRY_EMOJIS.get(country, COUNTRY_EMOJIS["Unknown"])
+    emoji = get_country_emoji(country)
     
     # Map network type to short format
     network_map = {
@@ -693,7 +724,7 @@ async def test_config_batch(configs: List[str], start_port: int = 1080, batch_si
     """Test a batch of configs simultaneously and optionally sort by ping"""
     config_counter.reset()
     
-    # اضافه کردن خروجی برای check_configs.php
+    # اضافه کردن خروجی برا check_configs.php
     print(f"Total configs: {len(configs)}")
     
     tasks = []
@@ -874,6 +905,127 @@ def priority_key(config: str) -> int:
     else:
         return 3
 
+def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="LoadBalancer-Hamshahri"):
+    """
+    Create a load balancer config from multiple working configs
+    configs: List of JSON configurations
+    """
+    loadbalancer_config = {
+        "remarks": name,
+        "log": {
+            "access": "",
+            "error": "",
+            "loglevel": "warning"
+        },
+        "inbounds": [
+            {
+                "tag": "socks",
+                "port": 10808,
+                "listen": "127.0.0.1",
+                "protocol": "socks",
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls"],
+                    "routeOnly": False
+                },
+                "settings": {
+                    "auth": "noauth",
+                    "udp": True,
+                    "allowTransparent": False
+                }
+            },
+            {
+                "tag": "http",
+                "port": 10809,
+                "listen": "127.0.0.1",
+                "protocol": "http",
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls"],
+                    "routeOnly": False
+                },
+                "settings": {
+                    "auth": "noauth",
+                    "udp": True,
+                    "allowTransparent": False
+                }
+            }
+        ],
+        "outbounds": [],
+        "routing": {
+            "domainStrategy": "IPIfNonMatch",
+            "rules": [],
+            "balancers": [
+                {
+                    "tag": "balancer",
+                    "selector": []
+                }
+            ]
+        }
+    }
+
+    # Add outbounds from working configs
+    for i, config in enumerate(configs):
+        outbound = config.get("outbounds", [])[0]  # Get the first outbound
+        if outbound:
+            tag = f"proxy_{i}"
+            outbound["tag"] = tag
+            loadbalancer_config["outbounds"].append(outbound)
+            loadbalancer_config["routing"]["balancers"][0]["selector"].append(tag)
+
+    # Add routing rule for balancer
+    loadbalancer_config["routing"]["rules"].append({
+        "type": "field",
+        "network": "tcp,udp",
+        "balancerTag": "balancer",
+        "outboundTag": "proxy_0"
+    })
+
+    # Add direct and block outbounds
+    loadbalancer_config["outbounds"].extend([
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ])
+
+    # Save to file
+    with open(output_file, 'w') as f:
+        json.dump(loadbalancer_config, f, indent=4)
+    
+    print(f"Load balancer configuration saved to {output_file}")
+
+def get_country_emoji(country_str: str) -> str:
+    """Get country emoji from country string, handling special cases"""
+    # Remove any extra information in parentheses
+    country = country_str.split('(')[0].strip()
+    
+    # Handle special cases
+    country_mapping = {
+        "Sofia": "Bulgaria",
+        "Moscow": "Russia",
+        "Sankt-Peterburg": "Russia",
+        "Beijing": "China",
+        "Shanghai": "China",
+        # Add more city-to-country mappings as needed
+    }
+    
+    # Try to map city to country
+    if country in country_mapping:
+        country = country_mapping[country]
+    
+    # Get emoji from COUNTRY_EMOJIS
+    return COUNTRY_EMOJIS.get(country, COUNTRY_EMOJIS["Unknown"])
 
 async def main():
     parser = argparse.ArgumentParser(description='Test V2Ray configurations')
@@ -891,6 +1043,9 @@ async def main():
     parser.add_argument('-sort', choices=['ping'], help='Sort configs by ping time')
     parser.add_argument('-name', type=str, help='Append a custom name to the config names')
     parser.add_argument('-checkname', action='store_true', help='Check if config names contain "Hamshahri" and skip renaming if they do')
+    parser.add_argument('-loadbalancer', action='store_true', help='Create load balancer config from working configs')
+    parser.add_argument('-lb-output', default='loadbalancer.json', help='Output file for load balancer config')
+    parser.add_argument('-lb-name', default='LoadBalancer-Hamshahri', help='Name for load balancer config')
 
     args = parser.parse_args()
     
@@ -1004,6 +1159,21 @@ async def main():
             print(f"Total configs saved: {total_saved}")
             print(f"Success rate for new configs: {(total_new / len(all_results) * 100):.1f}%")
             print(f"Updated working configs file: {args.save}")
+
+            # After printing the final summary
+            if args.loadbalancer:
+                print("\nCreating load balancer configuration...")
+                successful_configs = []
+                for result in all_results:
+                    if result["status"] == "success":
+                        config_json = config_to_json(result["config"])
+                        successful_configs.append(config_json)
+                
+                if successful_configs:
+                    create_loadbalancer_config(successful_configs, args.lb_output, args.lb_name)
+                    print(f"Load balancer configuration saved to: {args.lb_output}")
+                else:
+                    print("No working configs found for load balancer")
 
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
