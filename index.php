@@ -771,7 +771,7 @@ $is_valid = !$user['activated_at'] || $is_active;
                         <td class="link-buttons">
                             <?php if ($is_valid): ?>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
-                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
+                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB</button>
                             <?php else: ?>
                                 Link Expired
                             <?php endif; ?>
@@ -1022,7 +1022,7 @@ window.onclick = function(event) {
     }
 </style>
 
-<!-- اضافه کردن اسکریپت‌های جدید -->
+<!-- اضافه کر��ن اسکریپت‌های جدید -->
 <script>
     function openBackupModal() {
         document.getElementById('backupModal').style.display = 'block';
