@@ -287,21 +287,23 @@ function formatDaysRemaining($days, $is_active) {
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 0;
+            padding: 0;
             background-color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
         }
         .container {
             background-color: white;
             padding: 20px 40px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            width: 100%;
-            min-width: 1300px;
-            margin: 0 auto;
+            width: 95%;
+            max-width: 1400px;
+            margin: 20px auto;
         }
-        .edit-btn, .qr-btn, .delete-btn {
+        .edit-btn, .qr-btn, .delete-btn, .copy-btn {
             min-width: fit-content;
             padding: 5px 10px;
             margin: 0 2px;
@@ -313,13 +315,10 @@ function formatDaysRemaining($days, $is_active) {
             align-items: center;
             flex-wrap: nowrap;
         }
-        .copy-btn {
-            min-width: fit-content;
-            padding: 5px 10px;
-            margin: 2px;
-        }
         td {
             white-space: nowrap;
+            padding: 10px;
+            text-align: center;
         }
         h1 { text-align: center; color: #333; }
         form {
@@ -347,7 +346,7 @@ function formatDaysRemaining($days, $is_active) {
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            table-layout: fixed;
         }
         th, td {
             padding: 10px;
