@@ -530,8 +530,9 @@ if (isset($_POST['check_interval'])) {
         }
         .action-buttons {
             display: flex;
-            gap: 5px;
-            justify-content: center;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-bottom: 20px;
         }
         .settings-form {
             margin-bottom: 1rem;
@@ -609,8 +610,35 @@ if (isset($_POST['check_interval'])) {
         .action-buttons {
             display: flex;
             gap: 10px;
-            justify-content: flex-start;
+            justify-content: flex-end;
             margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+
+        .btn-secondary {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #1976D2;
         }
     </style>
 </head>
@@ -619,8 +647,8 @@ if (isset($_POST['check_interval'])) {
         <h1>Check Subscription Configs</h1>
         
         <div class="action-buttons">
-            <a href="index.php" class="btn">Back</a>
-            <button onclick="openAutoCheckDialog()" class="btn">Auto-Check Settings</button>
+            <button onclick="openAutoCheckDialog()" class="btn btn-primary">Auto-Check Settings</button>
+            <button onclick="window.location.href='index.php'" class="btn btn-secondary">Back</button>
         </div>
 
         <?= $message ?>
@@ -648,37 +676,6 @@ if (isset($_POST['check_interval'])) {
             <div class="success" style="direction: rtl;">تست کانفیگ‌ها با موفقیت انجام شد.</div>
         </div>
         <?php endif; ?>
-
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3>تنظیمات بررسی خودکار</h3>
-            </div>
-            <div class="card-body">
-                <?php if (isset($_GET['settings_saved'])): ?>
-                <div class="alert alert-success">تنظیمات با موفقیت ذخیره شد</div>
-                <?php endif; ?>
-
-                <form method="POST" class="settings-form">
-                    <div class="form-group">
-                        <label for="check_interval">فاصله زمانی بررسی خودکار (ساعت):</label>
-                        <div class="input-group" style="max-width: 200px;">
-                            <input type="number" id="check_interval" name="check_interval" 
-                                   value="<?php echo $settings['check_interval']; ?>" 
-                                   min="1" required class="form-control">
-                            <div class="input-group-append">
-                                <button type="submit" class="btn btn-primary">ذخیره</button>
-                            </div>
-                        </div>
-                        <small class="form-text text-muted">
-                            حداقل زمان مجاز 1 ساعت است
-                            <?php if ($settings['last_check']): ?>
-                            <br>آخرین بررسی: <?php echo $settings['last_check']; ?>
-                            <?php endif; ?>
-                        </small>
-                    </div>
-                </form>
-            </div>
-        </div>
 
         <h2>Recent Checks</h2>
         <table class="history-table">
