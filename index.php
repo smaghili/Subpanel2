@@ -551,6 +551,32 @@ function formatDaysRemaining($days, $is_active) {
     font-weight: bold;
 }
 
+        .link-buttons {
+            display: flex;
+            gap: 5px;
+            flex-direction: column;
+            align-items: center;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            align-items: center;
+            min-height: 40px;
+        }
+        td {
+            vertical-align: middle;
+            height: 60px;
+        }
+        .copy-btn {
+            width: 100px;
+            margin: 2px 0;
+        }
+        th {
+            text-align: center;
+            vertical-align: middle;
+        }
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
@@ -735,7 +761,7 @@ $is_valid = !$user['activated_at'] || $is_active;
             <?php endif; ?>
         </td>
                         <td><?= $user['config_limit'] ?></td>
-                        <td>
+                        <td class="link-buttons">
                             <?php if ($is_valid): ?>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
@@ -999,7 +1025,7 @@ window.onclick = function(event) {
         document.getElementById('backupModal').style.display = 'none';
     }
     
-    // اضافه کردن به window.onclick موجود
+    // اضافه کردن به window.onclick موجو��
     window.onclick = function(event) {
         if (event.target == document.getElementById('editModal')) {
             closeEditModal();
@@ -1017,19 +1043,5 @@ window.onclick = function(event) {
         this.closest('form').submit();
     });
 </script>
-
-<button onclick="createLoadBalancer()" class="action-button">Create Load Balancer</button>
-
-<div id="qrDialog" class="qr-dialog-overlay">
-    <div class="qr-dialog">
-        <h3>Load Balancer Config</h3>
-        <div id="qrCode"></div>
-        <input type="text" id="configUrl" class="url-input" readonly>
-        <div class="button-group">
-            <button onclick="copyConfigUrl()" class="action-button">Copy URL</button>
-            <button onclick="closeQrDialog()" class="action-button">Close</button>
-        </div>
-    </div>
-</div>
 </body>
 </html>
