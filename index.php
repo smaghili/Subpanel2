@@ -553,30 +553,37 @@ function formatDaysRemaining($days, $is_active) {
 
         .link-buttons {
             display: flex;
-            gap: 5px;
             flex-direction: column;
-            align-items: center;
+            gap: 5px;
         }
         .action-buttons {
             display: flex;
             gap: 5px;
             justify-content: center;
-            align-items: center;
-            min-height: 40px;
         }
         td {
             vertical-align: middle;
-            height: 60px;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            text-align: center;
+            vertical-align: middle;
+            padding: 10px;
         }
         .copy-btn {
             width: 100px;
             margin: 2px 0;
         }
-        th {
-            text-align: center;
-            vertical-align: middle;
+        table {
+            table-layout: fixed;
         }
-
+        table th:nth-child(1) { width: 15%; } /* Name */
+        table th:nth-child(2) { width: 20%; } /* Expiration */
+        table th:nth-child(3) { width: 10%; } /* Status */
+        table th:nth-child(4) { width: 10%; } /* Config Limit */
+        table th:nth-child(5) { width: 20%; } /* Links */
+        table th:nth-child(6) { width: 25%; } /* Actions */
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
@@ -1025,7 +1032,7 @@ window.onclick = function(event) {
         document.getElementById('backupModal').style.display = 'none';
     }
     
-    // اضافه کردن به window.onclick موجو��
+    // اضافه کردن به window.onclick موجود
     window.onclick = function(event) {
         if (event.target == document.getElementById('editModal')) {
             closeEditModal();
