@@ -287,7 +287,7 @@ function formatDaysRemaining($days, $is_active) {
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -297,6 +297,8 @@ function formatDaysRemaining($days, $is_active) {
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 100%;
+            min-width: 1100px;
         }
         h1 { text-align: center; color: #333; }
         form {
