@@ -1076,5 +1076,19 @@ window.onclick = function(event) {
         this.closest('form').submit();
     });
 </script>
+
+<script>
+function copyToClipboard(text, button, type) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = type === 'lb' ? 'Copy LB Link' : 'Copy Link';
+        button.textContent = 'Copied';
+        setTimeout(() => {
+            button.textContent = originalText;
+        }, 5000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+</script>
 </body>
 </html>
