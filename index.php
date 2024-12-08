@@ -506,6 +506,106 @@ function formatDaysRemaining($days, $is_active) {
 
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+async function createLoadBalancer() {
+    const selectedConfigs = getSelectedConfigs();
+    if (selectedConfigs.length === 0) {
+        showNotification('Please select at least one config', 'error');
+        return;
+    }
+
+    fetch('api.php?action=loadbalancer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            configs: selectedConfigs
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Loadbalancer config created successfully', 'success');
+            // Handle the loadbalancer config data
+            const configData = data.data;
+            // Show config in dialog or handle as needed
+            showConfigDialog(configData);
+        } else {
+            showNotification(data.error || 'Failed to create loadbalancer config', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Failed to create loadbalancer config', 'error');
+    });
+}
+
+function closeQrDialog() {
+    document.getElementById('qrDialog').style.display = 'none';
+}
+
+function copyConfigUrl() {
+    const configUrl = document.getElementById('configUrl');
+    configUrl.select();
+    document.execCommand('copy');
+}
+</script>
+
+<style>
+.action-button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px;
+}
+
+.action-button:hover {
+    background-color: #45a049;
+}
+
+.qr-dialog {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.qr-dialog-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+}
+
+.url-input {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+</style>
 </head>
 <body>
     <div class="container">
@@ -868,5 +968,19 @@ window.onclick = function(event) {
         this.closest('form').submit();
     });
 </script>
+
+<button onclick="createLoadBalancer()" class="action-button">Create Load Balancer</button>
+
+<div id="qrDialog" class="qr-dialog-overlay">
+    <div class="qr-dialog">
+        <h3>Load Balancer Config</h3>
+        <div id="qrCode"></div>
+        <input type="text" id="configUrl" class="url-input" readonly>
+        <div class="button-group">
+            <button onclick="copyConfigUrl()" class="action-button">Copy URL</button>
+            <button onclick="closeQrDialog()" class="action-button">Close</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

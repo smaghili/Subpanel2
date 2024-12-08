@@ -24,8 +24,13 @@ CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
 BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
 SCRIPTS_DIR="/var/www/scripts"
 SESSIONS_DIR="/var/www/sessions"
+LOADBALANCER_DIR="/var/www/html/loadbalancer"
 
-sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR $SESSIONS_DIR
+sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR $SESSIONS_DIR $LOADBALANCER_DIR
+
+# Set permissions for loadbalancer directory
+sudo chown -R www-data:www-data $LOADBALANCER_DIR
+sudo chmod 755 $LOADBALANCER_DIR
 
 # Create backup config file
 if [ ! -f "$BACKUP_CONFIG_FILE" ]; then
