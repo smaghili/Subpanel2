@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
     "Spain": "🇪🇸",
-    "Belgium": "🇧🇪",
+    "Belgium": "���🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
     "United Arab Emirates": "🇦🇪",
@@ -1046,6 +1046,8 @@ async def main():
     parser.add_argument('-loadbalancer', action='store_true', help='Create load balancer config from working configs')
     parser.add_argument('-lb-output', default='loadbalancer.json', help='Output file for load balancer config')
     parser.add_argument('-lb-name', default='LoadBalancer-Hamshahri', help='Name for load balancer config')
+    parser.add_argument('-nocheck', action='store_true', help='Skip testing configs when creating loadbalancer')
+    parser.add_argument('-count', type=int, help='Number of configs to use (limits the configs processed)')
 
     args = parser.parse_args()
     
@@ -1059,9 +1061,38 @@ async def main():
                 configs = fetch_subscription(args.config)
             else:
                 configs = [args.config]
+        elif args.file:
+            input_file = args.file
+            configs = read_configs_from_file(args.file)
 
         if not configs:
             print("No valid configs found!")
+            return
+
+        # Limit number of configs if count is specified
+        if args.count and args.count > 0:
+            original_count = len(configs)
+            configs = configs[:args.count]
+            print(f"\nLimiting configs to first {len(configs)} of {original_count} configs")
+
+        # If -nocheck is used with -loadbalancer, skip testing and create loadbalancer directly
+        if args.loadbalancer and args.nocheck:
+            print("\nCreating load balancer configuration without testing configs...")
+            successful_configs = []
+            for config in configs:
+                try:
+                    config_json = config_to_json(config)
+                    if "error" not in config_json:
+                        successful_configs.append(config_json)
+                except Exception as e:
+                    print(f"Error processing config: {str(e)}")
+                    continue
+            
+            if successful_configs:
+                create_loadbalancer_config(successful_configs, args.lb_output, args.lb_name)
+                print(f"Load balancer configuration saved to: {args.lb_output}")
+            else:
+                print("No valid configs found for load balancer")
             return
 
         tcp_only = args.nontcp

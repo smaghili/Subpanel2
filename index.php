@@ -174,10 +174,34 @@ elseif (isset($_POST['edit_id'])) {
                 $configs = explode("\n", trim($config_content));
                 $limited_configs = array_slice($configs, 0, $config_limit);
                 $encoded_config = base64_encode(implode("\n", $limited_configs));
+
+                // Create temporary file for configs
+                $temp_config_file = tempnam(sys_get_temp_dir(), 'configs_');
+                file_put_contents($temp_config_file, implode("\n", $limited_configs));
+
+                // Create loadbalancer config using v2raycheck.py
+                $loadbalancer_output_file = tempnam(sys_get_temp_dir(), 'lb_');
+                $command = "python3 /var/www/html/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
+                          " -loadbalancer -nocheck -count " . escapeshellarg($config_limit) .
+                          " -lb-output " . escapeshellarg($loadbalancer_output_file);
+                
+                exec($command, $output, $return_var);
+
+                // Read the loadbalancer config
+                if ($return_var === 0 && file_exists($loadbalancer_output_file)) {
+                    $loadbalancer_encoded = base64_encode(file_get_contents($loadbalancer_output_file));
+                } else {
+                    throw new Exception('Failed to create loadbalancer config');
+                }
+
+                // Clean up temporary files
+                unlink($temp_config_file);
+                unlink($loadbalancer_output_file);
                 
                 $expiration_date = date('Y-m-d', strtotime("{$result['activated_at']} +{$result['duration']} days"));
 
                 $access_token = bin2hex(random_bytes(16));
+                $loadbalancer_token = bin2hex(random_bytes(16));
                 
                 if ($is_onhold) {
                     $activated_at = null;
@@ -185,10 +209,12 @@ elseif (isset($_POST['edit_id'])) {
                     $activated_at = date('Y-m-d H:i:s');
                 }
 
-                $stmt = $db->prepare('INSERT INTO users (name, subscription_link, access_token, config_limit, activated_at, duration) VALUES (:name, :link, :token, :limit, :activated_at, :duration)');
+                $stmt = $db->prepare('INSERT INTO users (name, subscription_link, loadbalancer_link, access_token, loadbalancer_token, config_limit, activated_at, duration) VALUES (:name, :link, :lb_link, :token, :lb_token, :limit, :activated_at, :duration)');
                 $stmt->bindValue(':name', $name, SQLITE3_TEXT);
                 $stmt->bindValue(':link', $encoded_config, SQLITE3_TEXT);
+                $stmt->bindValue(':lb_link', $loadbalancer_encoded, SQLITE3_TEXT);
                 $stmt->bindValue(':token', $access_token, SQLITE3_TEXT);
+                $stmt->bindValue(':lb_token', $loadbalancer_token, SQLITE3_TEXT);
                 $stmt->bindValue(':limit', $config_limit, SQLITE3_INTEGER);
                 if ($activated_at) {
                     $stmt->bindValue(':activated_at', $activated_at, SQLITE3_TEXT);
@@ -691,6 +717,7 @@ $is_valid = !$user['activated_at'] || $is_active;
                         <td>
                             <?php if ($is_valid): ?>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
+                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
                             <?php else: ?>
                                 Link Expired
                             <?php endif; ?>
@@ -706,6 +733,7 @@ $is_valid = !$user['activated_at'] || $is_active;
 
                             <?php if ($is_valid): ?>
                                 <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">QR</button>
+                                <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')" style="background-color: #2196F3;">LB QR</button>
                             <?php endif; ?>
                             <form method="POST" onsubmit="return confirm('Are you sure you want to delete this subscription?')" style="display: inline;">
                                 <input type="hidden" name="delete_id" value="<?= $user['id'] ?>">

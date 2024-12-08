@@ -15,9 +15,31 @@ function update_user_configs($db, $user_id, $config_limit) {
     // Encode configs
     $encoded_config = base64_encode(implode("\n", $limited_configs));
     
-    // Update database
-    $stmt = $db->prepare('UPDATE users SET subscription_link = :link WHERE id = :id');
+    // Create loadbalancer config
+    $temp_config_file = tempnam(sys_get_temp_dir(), 'configs_');
+    file_put_contents($temp_config_file, implode("\n", $limited_configs));
+    $loadbalancer_output_file = tempnam(sys_get_temp_dir(), 'lb_');
+    
+    $command = "python3 /var/www/html/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
+               " -loadbalancer -nocheck -count " . escapeshellarg($config_limit) .
+               " -lb-output " . escapeshellarg($loadbalancer_output_file);
+    
+    exec($command, $output, $return_var);
+    
+    if ($return_var === 0 && file_exists($loadbalancer_output_file)) {
+        $loadbalancer_encoded = base64_encode(file_get_contents($loadbalancer_output_file));
+    } else {
+        $loadbalancer_encoded = $encoded_config; // Fallback to regular config if loadbalancer creation fails
+    }
+    
+    // Clean up temporary files
+    unlink($temp_config_file);
+    unlink($loadbalancer_output_file);
+    
+    // Update both regular and loadbalancer configs
+    $stmt = $db->prepare('UPDATE users SET subscription_link = :link, loadbalancer_link = :lb_link WHERE id = :id');
     $stmt->bindValue(':link', $encoded_config, SQLITE3_TEXT);
+    $stmt->bindValue(':lb_link', $loadbalancer_encoded, SQLITE3_TEXT);
     $stmt->bindValue(':id', $user_id, SQLITE3_INTEGER);
     return $stmt->execute();
 }
@@ -34,24 +56,33 @@ try {
     $db->busyTimeout(5000);
     $db->exec('PRAGMA journal_mode = WAL');
 
-    $stmt = $db->prepare('SELECT id, subscription_link, name, activated_at, duration, config_limit FROM users WHERE access_token = :token');
+    // Check if this is a loadbalancer request
+    $is_loadbalancer = isset($_GET['lb']) && $_GET['lb'] === '1';
+    
+    if ($is_loadbalancer) {
+        $stmt = $db->prepare('SELECT id, loadbalancer_link as subscription_link, name, activated_at, duration, config_limit FROM users WHERE loadbalancer_token = :token');
+    } else {
+        $stmt = $db->prepare('SELECT id, subscription_link, name, activated_at, duration, config_limit FROM users WHERE access_token = :token');
+    }
+    
     $stmt->bindValue(':token', $_GET['token'], SQLITE3_TEXT);
     $result = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
-
+    
     if (!$result) {
         http_response_code(404);
         exit('Invalid token');
     }
-
+    
     if (!$result['activated_at']) {
         $activated_at = date('Y-m-d H:i:s');
-        $updateStmt = $db->prepare('UPDATE users SET activated_at = :activated_at WHERE access_token = :token');
+        $updateStmt = $db->prepare('UPDATE users SET activated_at = :activated_at WHERE ' . 
+            ($is_loadbalancer ? 'loadbalancer_token' : 'access_token') . ' = :token');
         $updateStmt->bindValue(':activated_at', $activated_at, SQLITE3_TEXT);
         $updateStmt->bindValue(':token', $_GET['token'], SQLITE3_TEXT);
         $updateStmt->execute();
         $result['activated_at'] = $activated_at;
     }
-
+    
     // Calculate expiration
     $expiration_date = date('Y-m-d', strtotime("{$result['activated_at']} +{$result['duration']} days"));
     $expiration_timestamp = strtotime($expiration_date);
@@ -61,12 +92,16 @@ try {
         http_response_code(403);
         exit('Subscription expired');
     }
-
+    
     // Force update configs
     update_user_configs($db, $result['id'], $result['config_limit']);
     
     // Get fresh configs
-    $stmt = $db->prepare('SELECT subscription_link FROM users WHERE id = :id');
+    if ($is_loadbalancer) {
+        $stmt = $db->prepare('SELECT loadbalancer_link as subscription_link FROM users WHERE id = :id');
+    } else {
+        $stmt = $db->prepare('SELECT subscription_link FROM users WHERE id = :id');
+    }
     $stmt->bindValue(':id', $result['id'], SQLITE3_INTEGER);
     $fresh_result = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
     $configs = base64_decode($fresh_result['subscription_link']);
@@ -103,6 +138,9 @@ try {
     $lastUpdateTime = date('Y-m-d H:i', filemtime($configFile));
     
     $titleText = "🔄 Update: {$lastUpdateTime} | 👤 {$result['name']} | ⏳ Days: {$daysRemaining}";
+    if ($is_loadbalancer) {
+        $titleText = "⚖️ LoadBalancer | " . $titleText;
+    }
     $titleConfig = createTitleConfig($titleText);
     
     $allConfigs = $titleConfig . "\n" . $configs;
@@ -112,7 +150,7 @@ try {
     header('Content-Type: text/plain');
     
     echo $allConfigs;
-
+    
 } catch (Exception $e) {
     error_log("Error in sub.php: " . $e->getMessage());
     http_response_code(500);
