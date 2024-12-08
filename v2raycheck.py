@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
     "Spain": "🇪🇸",
-    "Belgium": "���🇪",
+    "Belgium": "🇧🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
     "United Arab Emirates": "🇦🇪",
@@ -910,100 +910,149 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
     Create a load balancer config from multiple working configs
     configs: List of JSON configurations
     """
-    loadbalancer_config = {
-        "remarks": name,
-        "log": {
-            "access": "",
-            "error": "",
-            "loglevel": "warning"
-        },
-        "inbounds": [
-            {
-                "tag": "socks",
-                "port": 10808,
-                "listen": "127.0.0.1",
-                "protocol": "socks",
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": ["http", "tls"],
-                    "routeOnly": False
+    try:
+        loadbalancer_config = {
+            "remarks": name,
+            "log": {
+                "access": "",
+                "error": "",
+                "loglevel": "warning"
+            },
+            "inbounds": [
+                {
+                    "tag": "socks",
+                    "port": 10808,
+                    "listen": "127.0.0.1",
+                    "protocol": "socks",
+                    "sniffing": {
+                        "enabled": True,
+                        "destOverride": ["http", "tls"],
+                        "routeOnly": False
+                    },
+                    "settings": {
+                        "auth": "noauth",
+                        "udp": True,
+                        "allowTransparent": False
+                    }
                 },
-                "settings": {
-                    "auth": "noauth",
-                    "udp": True,
-                    "allowTransparent": False
+                {
+                    "tag": "http",
+                    "port": 10809,
+                    "listen": "127.0.0.1",
+                    "protocol": "http",
+                    "sniffing": {
+                        "enabled": True,
+                        "destOverride": ["http", "tls"],
+                        "routeOnly": False
+                    },
+                    "settings": {
+                        "auth": "noauth",
+                        "udp": True,
+                        "allowTransparent": False
+                    }
                 }
+            ],
+            "outbounds": [],
+            "routing": {
+                "domainStrategy": "IPOnDemand",
+                "rules": [],
+                "balancers": [
+                    {
+                        "tag": "balancer",
+                        "selector": []
+                    }
+                ]
+            }
+        }
+
+        # Process each config
+        for i, config in enumerate(configs):
+            if not config.strip():
+                continue
+
+            try:
+                # Handle vmess:// format
+                if config.startswith('vmess://'):
+                    config_json = json.loads(base64.b64decode(config[8:]).decode('utf-8'))
+                else:
+                    continue  # Skip non-vmess configs for now
+
+                tag = f"proxy_{i}"
+                outbound = {
+                    "tag": tag,
+                    "protocol": "vmess",
+                    "settings": {
+                        "vnext": [
+                            {
+                                "address": config_json.get("add", ""),
+                                "port": int(config_json.get("port", 0)),
+                                "users": [
+                                    {
+                                        "id": config_json.get("id", ""),
+                                        "alterId": int(config_json.get("aid", 0)),
+                                        "security": config_json.get("scy", "auto")
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "streamSettings": {
+                        "network": config_json.get("net", "tcp"),
+                        "security": config_json.get("tls", "none"),
+                        "tlsSettings": {
+                            "serverName": config_json.get("sni", "")
+                        } if config_json.get("tls") else {},
+                        "wsSettings": {
+                            "path": config_json.get("path", ""),
+                            "headers": {
+                                "Host": config_json.get("host", "")
+                            }
+                        } if config_json.get("net") == "ws" else {}
+                    }
+                }
+
+                loadbalancer_config["outbounds"].append(outbound)
+                loadbalancer_config["routing"]["balancers"][0]["selector"].append(tag)
+
+            except (json.JSONDecodeError, UnicodeDecodeError, KeyError) as e:
+                print(f"Error processing config {i}: {str(e)}")
+                continue
+
+        # Add balancer outbound
+        loadbalancer_config["routing"]["rules"].append({
+            "type": "field",
+            "balancerTag": "balancer",
+            "outboundTag": "direct",
+            "network": "tcp,udp"
+        })
+
+        # Add direct and blackhole outbounds
+        loadbalancer_config["outbounds"].extend([
+            {
+                "tag": "direct",
+                "protocol": "freedom",
+                "settings": {}
             },
             {
-                "tag": "http",
-                "port": 10809,
-                "listen": "127.0.0.1",
-                "protocol": "http",
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": ["http", "tls"],
-                    "routeOnly": False
-                },
-                "settings": {
-                    "auth": "noauth",
-                    "udp": True,
-                    "allowTransparent": False
-                }
+                "tag": "blackhole",
+                "protocol": "blackhole",
+                "settings": {}
             }
-        ],
-        "outbounds": [],
-        "routing": {
-            "domainStrategy": "IPIfNonMatch",
-            "rules": [],
-            "balancers": [
-                {
-                    "tag": "balancer",
-                    "selector": []
-                }
-            ]
-        }
-    }
+        ])
 
-    # Add outbounds from working configs
-    for i, config in enumerate(configs):
-        outbound = config.get("outbounds", [])[0]  # Get the first outbound
-        if outbound:
-            tag = f"proxy_{i}"
-            outbound["tag"] = tag
-            loadbalancer_config["outbounds"].append(outbound)
-            loadbalancer_config["routing"]["balancers"][0]["selector"].append(tag)
+        # Verify we have at least one valid outbound
+        if not loadbalancer_config["routing"]["balancers"][0]["selector"]:
+            raise Exception("No valid configs found for load balancer")
 
-    # Add routing rule for balancer
-    loadbalancer_config["routing"]["rules"].append({
-        "type": "field",
-        "network": "tcp,udp",
-        "balancerTag": "balancer",
-        "outboundTag": "proxy_0"
-    })
+        # Write the config to file
+        with open(output_file, 'w') as f:
+            json.dump(loadbalancer_config, f, indent=4)
 
-    # Add direct and block outbounds
-    loadbalancer_config["outbounds"].extend([
-        {
-            "tag": "direct",
-            "protocol": "freedom",
-            "settings": {}
-        },
-        {
-            "tag": "block",
-            "protocol": "blackhole",
-            "settings": {
-                "response": {
-                    "type": "http"
-                }
-            }
-        }
-    ])
+        return True
 
-    # Save to file
-    with open(output_file, 'w') as f:
-        json.dump(loadbalancer_config, f, indent=4)
-    
-    print(f"Load balancer configuration saved to {output_file}")
+    except Exception as e:
+        print(f"Error creating load balancer config: {str(e)}")
+        return False
 
 def get_country_emoji(country_str: str) -> str:
     """Get country emoji from country string, handling special cases"""

@@ -17,8 +17,20 @@ function update_user_configs($db, $user_id, $config_limit) {
     
     // Create loadbalancer config
     $temp_config_file = tempnam(sys_get_temp_dir(), 'configs_');
-    file_put_contents($temp_config_file, implode("\n", $limited_configs));
+    if ($temp_config_file === false) {
+        throw new Exception('Failed to create temporary config file');
+    }
+    
+    if (file_put_contents($temp_config_file, implode("\n", $limited_configs)) === false) {
+        unlink($temp_config_file);
+        throw new Exception('Failed to write configs to temporary file');
+    }
+    
     $loadbalancer_output_file = tempnam(sys_get_temp_dir(), 'lb_');
+    if ($loadbalancer_output_file === false) {
+        unlink($temp_config_file);
+        throw new Exception('Failed to create loadbalancer output file');
+    }
     
     $command = "python3 /var/www/html/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
                " -loadbalancer -nocheck -count " . escapeshellarg($config_limit) .
@@ -27,14 +39,29 @@ function update_user_configs($db, $user_id, $config_limit) {
     exec($command, $output, $return_var);
     
     if ($return_var === 0 && file_exists($loadbalancer_output_file)) {
-        $loadbalancer_encoded = base64_encode(file_get_contents($loadbalancer_output_file));
+        $loadbalancer_content = file_get_contents($loadbalancer_output_file);
+        if ($loadbalancer_content && ($json = json_decode($loadbalancer_content)) !== null) {
+            // Verify the JSON structure has required fields
+            if (isset($json->inbounds) && isset($json->outbounds) && isset($json->routing)) {
+                $loadbalancer_encoded = base64_encode($loadbalancer_content);
+            } else {
+                throw new Exception('Invalid loadbalancer config structure');
+            }
+        } else {
+            throw new Exception('Invalid JSON in loadbalancer config');
+        }
     } else {
-        $loadbalancer_encoded = $encoded_config; // Fallback to regular config if loadbalancer creation fails
+        $error_msg = implode("\n", $output);
+        throw new Exception('Failed to create loadbalancer config: ' . $error_msg);
     }
     
     // Clean up temporary files
-    unlink($temp_config_file);
-    unlink($loadbalancer_output_file);
+    if (file_exists($temp_config_file)) {
+        unlink($temp_config_file);
+    }
+    if (file_exists($loadbalancer_output_file)) {
+        unlink($loadbalancer_output_file);
+    }
     
     // Update both regular and loadbalancer configs
     $stmt = $db->prepare('UPDATE users SET subscription_link = :link, loadbalancer_link = :lb_link WHERE id = :id');
