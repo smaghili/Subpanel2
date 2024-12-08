@@ -271,10 +271,7 @@ function getDaysRemaining($expirationDate) {
 
 # Function to format the days remaining text
 function formatDaysRemaining($days, $is_active) {
-    if (!$is_active) {
-        return '(Expired)';
-    }
-    return "($days Days)";
+    return $is_active ? "($days Days)" : '(Expired)';
 }
 ?>
 <!DOCTYPE html>
@@ -302,23 +299,6 @@ function formatDaysRemaining($days, $is_active) {
             width: 95%;
             max-width: 1400px;
             margin: 20px auto;
-        }
-        .edit-btn, .qr-btn, .delete-btn, .copy-btn {
-            min-width: fit-content;
-            padding: 5px 10px;
-            margin: 0 2px;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: nowrap;
-        }
-        td {
-            white-space: nowrap;
-            padding: 10px;
-            text-align: center;
         }
         h1 { text-align: center; color: #333; }
         form {
@@ -352,36 +332,34 @@ function formatDaysRemaining($days, $is_active) {
             padding: 10px;
             border: 1px solid #ddd;
             text-align: center;
+            vertical-align: middle;
         }
         .active { color: green; }
         .expired { color: red; }
         a { color: #2196F3; text-decoration: none; }
         a:hover { text-decoration: underline; }
-        .delete-btn, .edit-btn {
-            background-color: #ff4444;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin: 0 5px;
-            width: 70px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.3s ease;
+        .days-remaining {
+            color: #666;
+            font-size: 0.9em;
+            margin-left: 5px;
         }
-        .edit-btn { background-color: #2196F3; }
-        .delete-btn:hover { background-color: #cc0000; }
-        .edit-btn:hover { background-color: #0b7dda; }
+        .days-critical {
+            color: #ff4444;
+        }
+        .days-expired {
+            color: #ff4444;
+            font-style: italic;
+        }
         .status-active {
             color: #4CAF50;
             font-weight: bold;
         }
         .status-expired {
             color: #ff4444;
+            font-weight: bold;
+        }
+        .status-onhold {
+            color: #ffa500;
             font-weight: bold;
         }
         .modal {
@@ -394,97 +372,19 @@ function formatDaysRemaining($days, $is_active) {
             background-color: rgba(0,0,0,0.5);
         }
         .modal-content {
-    background-color: white;
-    margin: 10% auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 400px;
-    max-width: 90%;
-    text-align: left;
-    box-sizing: border-box;
-}
-    .checkbox-wrapper {
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-    }
-
-    .checkbox-wrapper label {
-        display: inline-flex;
-        align-items: center;
-        margin: 0;
-        cursor: pointer;
-    }
-        #editModal .checkbox-wrapper {
-        text-align: left;
-    }
-
-    #editModal .checkbox-wrapper label {
-        display: inline-flex;
-        align-items: center;
-        white-space: nowrap;
-    }
-
-    #editModal .checkbox-wrapper input[type="checkbox"] {
-        margin-right: 8px;
-    }
-
-    .checkbox-wrapper input[type="checkbox"] {
-        margin: 0 8px 0 0;
-        vertical-align: middle;
-    }
-
-
-.modal-content form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.modal-content form input {
-    display: block;
-    width: calc(100% - 20px);
-    margin: 0 auto;
-    padding: 10px;
-    font-size: 14px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-sizing: border-box;
-}
-
-.modal-content form button {
-    width: 100%;
-    padding: 10px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-.modal-content form button:hover {
-    background-color: #45a049;
-}
-
-@media (max-width: 600px) {
-    .modal-content {
-        width: 90%;
-    }
-
-    .modal-content form input {
-        width: calc(100% - 10px);
-    }
-}
-
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            text-align: left;
+            box-sizing: border-box;
+        }
         .close {
             float: right;
             cursor: pointer;
             font-size: 24px;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 5px;
         }
         .config-form {
             margin: 20px 0;
@@ -506,7 +406,6 @@ function formatDaysRemaining($days, $is_active) {
             border-radius: 4px;
             font-family: monospace;
             box-sizing: border-box;
-
         }
         .section-title {
             margin: 20px 0 10px 0;
@@ -514,94 +413,13 @@ function formatDaysRemaining($days, $is_active) {
             border-bottom: 2px solid #eee;
         }
         #qrcode {
-    display: flex;
-    justify-content: center;
-    margin: 20px auto;
-}
-
-#qrcode img {
-    margin: 0 auto;
-    display: block;
-}
-        .qr-btn {
-    background-color: #9c27b0;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    margin: 0 5px;
-    width: 70px;
-    height: 30px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.3s ease;
-    }
-    .qr-btn:hover { background-color: #7B1FA2; }
-            .days-remaining {
-            color: #666;
-            font-size: 0.9em;
-            margin-left: 5px;
-        }
-        .days-critical {
-            color: #ff4444;
-        }
-        .days-expired {
-            color: #ff4444;
-            font-style: italic;
-        }
-                .copy-btn {
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        .copy-btn:hover {
-            background-color: #1976D2;
-        }
-        .copy-btn.copied {
-            background-color: #4CAF50;
-        }
-        .status-onhold {
-    color: #ffa500;
-    font-weight: bold;
-}
-
-        .link-buttons {
             display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 5px;
             justify-content: center;
+            margin: 20px auto;
         }
-        td {
-            vertical-align: middle;
-            padding: 10px;
-            text-align: center;
-        }
-        th {
-            text-align: center;
-            vertical-align: middle;
-            padding: 10px;
-        }
-        .copy-btn {
-            width: 90px;
-            margin: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        table {
-            table-layout: fixed;
+        #qrcode img {
+            margin: 0 auto;
+            display: block;
         }
         table th:nth-child(1) { width: 15%; } /* Name */
         table th:nth-child(2) { width: 20%; } /* Expiration */
@@ -710,17 +528,90 @@ function copyConfigUrl() {
     gap: 10px;
     margin-top: 10px;
 }
+
+.btn-base {
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin: 0 5px;
+    min-width: 70px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #4CAF50;
+}
+
+.btn-primary:hover {
+    background-color: #45a049;
+}
+
+.btn-delete {
+    background-color: #ff4444;
+}
+
+.btn-delete:hover {
+    background-color: #cc0000;
+}
+
+.btn-edit {
+    background-color: #2196F3;
+}
+
+.btn-edit:hover {
+    background-color: #0b7dda;
+}
+
+.btn-qr {
+    background-color: #9c27b0;
+}
+
+.btn-qr:hover {
+    background-color: #7B1FA2;
+}
+
+.btn-copy {
+    background-color: #2196F3;
+    width: 90px;
+    margin: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-copy:hover {
+    background-color: #1976D2;
+}
+
+.btn-copy.copied {
+    background-color: #4CAF50;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: nowrap;
+}
 </style>
 </head>
 <body>
     <div class="container">
         <h1>Subscription Management</h1>
         <div style="text-align: right;">
-            <button type="button" onclick="window.location.href='check_configs.php'" style="background-color: #FF9800; margin-right: 10px;">Check Configs</button>
-            <button type="button" onclick="window.location.href='backup_settings.php'" style="background-color: #9C27B0; margin-right: 10px;">Auto Backup Settings</button>
-            <button type="button" onclick="openBackupModal()" style="background-color: #2196F3; margin-right: 10px;">Backup & Restore</button>
+            <button type="button" onclick="window.location.href='check_configs.php'" class="btn-base" style="background-color: #FF9800; margin-right: 10px;">Check Configs</button>
+            <button type="button" onclick="window.location.href='backup_settings.php'" class="btn-base" style="background-color: #9C27B0; margin-right: 10px;">Auto Backup Settings</button>
+            <button type="button" onclick="openBackupModal()" class="btn-base btn-edit" style="margin-right: 10px;">Backup & Restore</button>
             <form method="POST" action="logout.php" style="display: inline;">
-                <button type="submit" style="background-color: #f44336;">Logout</button>
+                <button type="submit" class="btn-base btn-delete">Logout</button>
             </form>
         </div>
         <?= $success ?>
@@ -795,15 +686,15 @@ $is_valid = !$user['activated_at'] || $is_active;
                         <td><?= $user['config_limit'] ?></td>
                         <td>
                             <?php if ($is_valid): ?>
-                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
-                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
+                                <button class="btn-base btn-copy" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
+                                <button class="btn-base btn-copy" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
                             <?php else: ?>
                                 Link Expired
                             <?php endif; ?>
                         </td>
                         <td>
                             <div class="action-buttons">
-                                <button type="button" class="edit-btn" onclick="openEditModal(
+                                <button type="button" class="btn-base btn-edit" onclick="openEditModal(
                                     <?= $user['id'] ?>, 
                                     '<?= htmlspecialchars($user['name'], ENT_QUOTES) ?>', 
                                     <?= $user['activated_at'] ? "'{$user['activated_at']}'" : 'null' ?>, 
@@ -811,12 +702,12 @@ $is_valid = !$user['activated_at'] || $is_active;
                                     <?= $user['config_limit'] ?>
                                 )">Edit</button>
                                 <?php if ($is_valid): ?>
-                                    <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">QR</button>
-                                    <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')" style="background-color: #2196F3;">LB QR</button>
+                                    <button type="button" class="btn-base btn-qr" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">QR</button>
+                                    <button type="button" class="btn-base btn-qr" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')" style="background-color: #2196F3;">LB QR</button>
                                 <?php endif; ?>
                                 <form method="POST" onsubmit="return confirm('Are you sure you want to delete this subscription?')" style="display: inline;">
                                     <input type="hidden" name="delete_id" value="<?= $user['id'] ?>">
-                                    <button type="submit" class="delete-btn">Delete</button>
+                                    <button type="submit" class="btn-base btn-delete">Delete</button>
                                 </form>
                             </div>
                         </td>
@@ -1074,6 +965,68 @@ window.onclick = function(event) {
     document.getElementById('db_file').addEventListener('change', function() {
         this.closest('form').submit();
     });
+</script>
+
+<script>
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = 'block';
+    }
+
+    // Unified modal event handlers
+    window.onclick = function(event) {
+        const modals = ['editModal', 'qrModal', 'backupModal'];
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            if (modal && event.target === modal) {
+                closeModal(modalId);
+            }
+        });
+    };
+
+    function openEditModal(id, name, activatedAt, duration, configLimit) {
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_name').value = name;
+        document.getElementById('edit_config_limit').value = configLimit;
+
+        const isOnHold = !activatedAt || activatedAt === 'null' || activatedAt === null;
+        document.getElementById('edit_is_onhold').checked = isOnHold;
+        toggleEditExpirationField();
+
+        if (isOnHold) {
+            document.getElementById('edit_duration').value = duration;
+        } else {
+            document.getElementById('edit_expiration').value = calculateExpirationDate(activatedAt, duration);
+        }
+
+        openModal('editModal');
+    }
+
+    function showQRCode(url) {
+        openModal('qrModal');
+        if (qrcode === null) {
+            qrcode = new QRCode(document.getElementById("qrcode"), {
+                text: url,
+                width: 256,
+                height: 256
+            });
+        } else {
+            qrcode.clear();
+            qrcode.makeCode(url);
+        }
+    }
+
+    // Update existing close functions to use the unified closeModal
+    function closeEditModal() {
+        closeModal('editModal');
+    }
+
+    function closeQRModal() {
+        closeModal('qrModal');
+    }
 </script>
 </body>
 </html>
