@@ -177,28 +177,45 @@ elseif (isset($_POST['edit_id'])) {
 
                 // Create temporary file for configs
                 $temp_config_file = tempnam(sys_get_temp_dir(), 'configs_');
-                file_put_contents($temp_config_file, implode("\n", $limited_configs));
+                if ($temp_config_file === false) {
+                    throw new Exception('Failed to create temporary file');
+                }
+                
+                if (file_put_contents($temp_config_file, implode("\n", $limited_configs)) === false) {
+                    throw new Exception('Failed to write configs to temporary file');
+                }
 
                 // Create loadbalancer config using v2raycheck.py
                 $loadbalancer_output_file = tempnam(sys_get_temp_dir(), 'lb_');
+                if ($loadbalancer_output_file === false) {
+                    throw new Exception('Failed to create loadbalancer output file');
+                }
+
                 $command = "python3 /var/www/html/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
                           " -loadbalancer -nocheck -count " . escapeshellarg($config_limit) .
-                          " -lb-output " . escapeshellarg($loadbalancer_output_file);
+                          " -lb-output " . escapeshellarg($loadbalancer_output_file) . " 2>&1";
                 
                 exec($command, $output, $return_var);
 
                 // Read the loadbalancer config
-                if ($return_var === 0 && file_exists($loadbalancer_output_file)) {
-                    $loadbalancer_encoded = base64_encode(file_get_contents($loadbalancer_output_file));
-                } else {
-                    throw new Exception('Failed to create loadbalancer config');
+                if ($return_var !== 0) {
+                    throw new Exception('Failed to create loadbalancer config: ' . implode("\n", $output));
                 }
 
+                if (!file_exists($loadbalancer_output_file)) {
+                    throw new Exception('Loadbalancer output file not created');
+                }
+
+                $loadbalancer_content = file_get_contents($loadbalancer_output_file);
+                if ($loadbalancer_content === false) {
+                    throw new Exception('Failed to read loadbalancer config');
+                }
+
+                $loadbalancer_encoded = base64_encode($loadbalancer_content);
+
                 // Clean up temporary files
-                unlink($temp_config_file);
-                unlink($loadbalancer_output_file);
-                
-                $expiration_date = date('Y-m-d', strtotime("{$result['activated_at']} +{$result['duration']} days"));
+                @unlink($temp_config_file);
+                @unlink($loadbalancer_output_file);
 
                 $access_token = bin2hex(random_bytes(16));
                 $loadbalancer_token = bin2hex(random_bytes(16));
@@ -228,7 +245,9 @@ elseif (isset($_POST['edit_id'])) {
                     exit;
                 }
             } catch (Exception $e) {
-                $error = $e->getMessage();
+                error_log("Error creating user: " . $e->getMessage());
+                header('Location: /?error=' . urlencode($e->getMessage()));
+                exit;
             }
         }
     }
@@ -238,6 +257,8 @@ $success = isset($_GET['success']) ? '<div style="color: green; margin: 10px 0;"
 $deleted = isset($_GET['deleted']) ? '<div style="color: green; margin: 10px 0;">Subscription deleted successfully!</div>' : '';
 $edited = isset($_GET['edited']) ? '<div style="color: green; margin: 10px 0;">Subscription updated successfully!</div>' : '';
 $config_added = isset($_GET['config_added']) ? '<div style="color: green; margin: 10px 0;">Configs added successfully!</div>' : '';
+$error = isset($_GET['error']) ? '<div style="color: red; margin: 10px 0;">' . htmlspecialchars($_GET['error']) . '</div>' : '';
+
 $users = $db->query('SELECT * FROM users ORDER BY created_at DESC');
 
 # Updated function to handle expired subscriptions
@@ -648,7 +669,7 @@ function copyConfigUrl() {
         <?= $deleted ?>
         <?= $edited ?>
         <?= $config_added ?>
-        <?= $imported ?>
+        <?= $error ?>
 
         <h2 class="section-title">Create Subscription</h2>
         <!-- Your existing subscription form -->
