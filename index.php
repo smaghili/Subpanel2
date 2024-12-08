@@ -191,7 +191,7 @@ elseif (isset($_POST['edit_id'])) {
                     throw new Exception('Failed to create loadbalancer output file');
                 }
 
-                $command = "python3 /var/www/html/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
+                $command = "python3 /var/www/scripts/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
                           " -loadbalancer -nocheck -count " . escapeshellarg($config_limit) .
                           " -lb-output " . escapeshellarg($loadbalancer_output_file) . " 2>&1";
                 
