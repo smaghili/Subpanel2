@@ -893,14 +893,13 @@ $is_valid = !$user['activated_at'] || $is_active;
 
         // Add this new function for copying links
     function copyLink(button, link) {
+        const isLbButton = button.textContent.includes('LB');
         navigator.clipboard.writeText(link).then(function() {
-            // Change button text and style temporarily
             button.textContent = 'Copied!';
             button.classList.add('copied');
             
-            // Reset button after 4 seconds
             setTimeout(function() {
-                button.textContent = 'Copy Link';
+                button.textContent = isLbButton ? 'Copy LB Link' : 'Copy Link';
                 button.classList.remove('copied');
             }, 4000);
         }).catch(function(err) {
@@ -1075,20 +1074,6 @@ window.onclick = function(event) {
     document.getElementById('db_file').addEventListener('change', function() {
         this.closest('form').submit();
     });
-</script>
-
-<script>
-function copyToClipboard(text, button, type) {
-    navigator.clipboard.writeText(text).then(() => {
-        const originalText = type === 'lb' ? 'Copy LB Link' : 'Copy Link';
-        button.textContent = 'Copied';
-        setTimeout(() => {
-            button.textContent = originalText;
-        }, 5000);
-    }).catch(err => {
-        console.error('Failed to copy:', err);
-    });
-}
 </script>
 </body>
 </html>
