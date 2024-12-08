@@ -287,18 +287,39 @@ function formatDaysRemaining($days, $is_active) {
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
         }
         .container {
             background-color: white;
-            padding: 20px;
+            padding: 20px 40px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             width: 100%;
-            min-width: 1100px;
+            min-width: 1300px;
+            margin: 0 auto;
+        }
+        .edit-btn, .qr-btn, .delete-btn {
+            min-width: fit-content;
+            padding: 5px 10px;
+            margin: 0 2px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: nowrap;
+        }
+        .copy-btn {
+            min-width: fit-content;
+            padding: 5px 10px;
+            margin: 2px;
+        }
+        td {
+            white-space: nowrap;
         }
         h1 { text-align: center; color: #333; }
         form {
@@ -574,8 +595,11 @@ function formatDaysRemaining($days, $is_active) {
             padding: 10px;
         }
         .copy-btn {
-            width: 100px;
-            margin: 2px 0;
+            width: 90px;
+            margin: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         table {
             table-layout: fixed;
@@ -773,7 +797,7 @@ $is_valid = !$user['activated_at'] || $is_active;
                         <td>
                             <?php if ($is_valid): ?>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
-                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB</button>
+                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
                             <?php else: ?>
                                 Link Expired
                             <?php endif; ?>
