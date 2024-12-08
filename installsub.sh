@@ -147,9 +147,28 @@ sudo chmod 777 /var/lib/php/sessions
 CERT_PATH="/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"
 KEY_PATH="/etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem"
 
+# Create and run Telegram session
+python3 $SCRIPTS_DIR/telegram-session.py
+
+# Remove default nginx config and create symlink
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
+
+# Verify nginx config and restart
+nginx -t && systemctl restart nginx
+
+# Now get SSL certificate
 if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
-    sudo certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos --register-unsafely-without-email
+    # Stop nginx temporarily to free port 80
+    systemctl stop nginx
+    
+    # Get certificate
+    certbot certonly --standalone -d $DOMAIN_NAME --non-interactive --agree-tos --register-unsafely-without-email
+    
+    # Start nginx again
+    systemctl start nginx
 fi
+
 # Clone the GitHub repository
 repo_url="https://github.com/smaghili/SubPanel2.git"
 git clone "$repo_url" temp_dir
@@ -166,9 +185,6 @@ for file in *; do
 done
 cd ..
 rm -rf temp_dir
-
-# Create and run Telegram session
-python3 $SCRIPTS_DIR/telegram-session.py
 
 sed -i 's/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/' /etc/php/${PHP_VERSION}/fpm/php.ini
 sudo systemctl restart $PHP_FPM_SERVICE
