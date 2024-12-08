@@ -768,7 +768,7 @@ $is_valid = !$user['activated_at'] || $is_active;
             <?php endif; ?>
         </td>
                         <td><?= $user['config_limit'] ?></td>
-                        <td class="link-buttons">
+                        <td>
                             <?php if ($is_valid): ?>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
                                 <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB</button>
@@ -776,23 +776,24 @@ $is_valid = !$user['activated_at'] || $is_active;
                                 Link Expired
                             <?php endif; ?>
                         </td>
-                        <td class="action-buttons">
-                            <button type="button" class="edit-btn" onclick="openEditModal(
-    <?= $user['id'] ?>, 
-    '<?= htmlspecialchars($user['name'], ENT_QUOTES) ?>', 
-    <?= $user['activated_at'] ? "'{$user['activated_at']}'" : 'null' ?>, 
-    <?= $user['duration'] ?>, 
-    <?= $user['config_limit'] ?>
-)">Edit</button>
-
-                            <?php if ($is_valid): ?>
-                                <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">QR</button>
-                                <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')" style="background-color: #2196F3;">LB QR</button>
-                            <?php endif; ?>
-                            <form method="POST" onsubmit="return confirm('Are you sure you want to delete this subscription?')" style="display: inline;">
-                                <input type="hidden" name="delete_id" value="<?= $user['id'] ?>">
-                                <button type="submit" class="delete-btn">Delete</button>
-                            </form>
+                        <td>
+                            <div class="action-buttons">
+                                <button type="button" class="edit-btn" onclick="openEditModal(
+                                    <?= $user['id'] ?>, 
+                                    '<?= htmlspecialchars($user['name'], ENT_QUOTES) ?>', 
+                                    <?= $user['activated_at'] ? "'{$user['activated_at']}'" : 'null' ?>, 
+                                    <?= $user['duration'] ?>, 
+                                    <?= $user['config_limit'] ?>
+                                )">Edit</button>
+                                <?php if ($is_valid): ?>
+                                    <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">QR</button>
+                                    <button type="button" class="qr-btn" onclick="showQRCode('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')" style="background-color: #2196F3;">LB QR</button>
+                                <?php endif; ?>
+                                <form method="POST" onsubmit="return confirm('Are you sure you want to delete this subscription?')" style="display: inline;">
+                                    <input type="hidden" name="delete_id" value="<?= $user['id'] ?>">
+                                    <button type="submit" class="delete-btn">Delete</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 <?php endwhile; ?>
@@ -1022,7 +1023,7 @@ window.onclick = function(event) {
     }
 </style>
 
-<!-- اضافه کر��ن اسکریپت‌های جدید -->
+<!-- اضافه کردن اسکریپت‌های جدید -->
 <script>
     function openBackupModal() {
         document.getElementById('backupModal').style.display = 'block';
