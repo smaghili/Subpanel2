@@ -261,26 +261,6 @@ $error = isset($_GET['error']) ? '<div style="color: red; margin: 10px 0;">' . h
 
 $users = $db->query('SELECT * FROM users ORDER BY created_at DESC');
 
-// Helper functions
-function formatDaysRemaining($days, $is_active) {
-    return $is_active ? "($days Days)" : '(Expired)';
-}
-
-function calculateExpirationDate($activated_at, $duration) {
-    return date('Y-m-d', strtotime("$activated_at +$duration days"));
-}
-
-function getSubscriptionStatus($activated_at, $duration) {
-    if (!$activated_at) {
-        return ['status' => 'onhold', 'text' => 'On Hold'];
-    }
-    
-    $expiration_date = calculateExpirationDate($activated_at, $duration);
-    $is_active = strtotime($expiration_date) > time();
-    
-    return [
-        'status' => $is_active ? 'active' : 'expired',
-        'text' => $is_active ? 'Active' : 'Expired',
 # Updated function to handle expired subscriptions
 function getDaysRemaining($expirationDate) {
     $expiration = strtotime($expirationDate);
@@ -730,27 +710,6 @@ function copyConfigUrl() {
     gap: 10px;
     margin-top: 10px;
 }
-
-.copy-btn {
-    padding: 5px 10px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-right: 5px;
-    color: white;
-}
-
-.copy-link-btn {
-    background-color: #2196F3;
-}
-
-.copy-lb-btn {
-    background-color: #4CAF50;
-}
-
-.copy-btn:hover {
-    opacity: 0.9;
-}
 </style>
 </head>
 <body>
@@ -836,8 +795,8 @@ $is_valid = !$user['activated_at'] || $is_active;
                         <td><?= $user['config_limit'] ?></td>
                         <td>
                             <?php if ($is_valid): ?>
-                                <button class="copy-btn copy-link-btn" onclick="copyToClipboard('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>', this, 'normal')">Copy Link</button>
-                                <button class="copy-btn copy-lb-btn" onclick="copyToClipboard('<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1', this, 'lb')">Copy LB Link</button>
+                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['access_token'] ?>')">Copy Link</button>
+                                <button class="copy-btn" onclick="copyLink(this, '<?= $_SERVER['REQUEST_SCHEME'] ?>://<?= $_SERVER['HTTP_HOST'] ?>/sub.php?token=<?= $user['loadbalancer_token'] ?>&lb=1')">Copy LB Link</button>
                             <?php else: ?>
                                 Link Expired
                             <?php endif; ?>
@@ -1116,20 +1075,6 @@ window.onclick = function(event) {
     document.getElementById('db_file').addEventListener('change', function() {
         this.closest('form').submit();
     });
-</script>
-
-<script>
-function copyToClipboard(text, button, type) {
-    navigator.clipboard.writeText(text).then(() => {
-        const originalText = type === 'lb' ? 'Copy LB Link' : 'Copy Link';
-        button.textContent = 'Copied';
-        setTimeout(() => {
-            button.textContent = originalText;
-        }, 5000);
-    }).catch(err => {
-        console.error('Failed to copy:', err);
-    });
-}
 </script>
 </body>
 </html>
