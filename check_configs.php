@@ -150,8 +150,10 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
     $url = trim($_POST['subscription_url']);
     $bot_id = trim($_POST['bot_id']);
     
-    // ذخیره نام بات در فایل
-    file_put_contents('/var/www/config/bot_id.txt', $bot_id);
+    // فقط اگر bot_id وارد شده باشد، آن را ذخیره می‌کنیم
+    if (!empty($bot_id)) {
+        file_put_contents('/var/www/config/bot_id.txt', $bot_id);
+    }
     
     if (preg_match('/^https?:\/\/[^\s\/$.?#].[^\s]*$/i', $url)) {
         // سپس کانفیگ‌ها را چک می‌کنیم
@@ -162,14 +164,14 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                 VALUES (:name, :url, :bot_id, :total, :valid, datetime("now", "localtime"), datetime("now", "localtime"))');
             $stmt->bindValue(':name', $_POST['config_name'], SQLITE3_TEXT);
             $stmt->bindValue(':url', $url, SQLITE3_TEXT);
-            $stmt->bindValue(':bot_id', $_POST['bot_id'], SQLITE3_TEXT);
+            $stmt->bindValue(':bot_id', $bot_id, SQLITE3_TEXT);
             $stmt->bindValue(':total', $results['total'], SQLITE3_INTEGER);
             $stmt->bindValue(':valid', $results['valid'], SQLITE3_INTEGER);
             $stmt->execute();
             
             $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
 
-            // اگر نام بات وارد شده باشد، اطلاعات سرویس را هم چک می‌کنیم
+            // فقط اگر bot_id وارد شده باشد، اطلاعات مصرف را چک می‌کنیم
             if (!empty($bot_id)) {
                 $cmd = "python3 /var/www/scripts/monitor-bot.py 2>&1";
                 $bot_output = shell_exec($cmd);
@@ -188,8 +190,6 @@ elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscription_url'
                     $stmt->bindValue(':used_volume', $bot_data['used_volume'], SQLITE3_FLOAT);
                     $stmt->bindValue(':days_left', $bot_data['days_left'], SQLITE3_INTEGER);
                     $stmt->execute();
-
-                    $message = '<div class="success">تست کانفیگ‌ها با موفقیت انجام شد.</div>';
                 }
             }
         } else {
@@ -661,7 +661,8 @@ if (isset($_POST['check_interval'])) {
                 <input type="url" name="subscription_url" placeholder="Subscription URL" required style="margin-bottom: 10px;">
             </div>
             <div class="form-group">
-                <input type="text" name="bot_id" placeholder="Bot ID" required style="margin-bottom: 10px;">
+                <label for="bot_id">Bot ID:</label>
+                <input type="text" class="form-control" id="bot_id" name="bot_id" placeholder="Bot ID (Optional)" style="margin-bottom: 10px;">
             </div>
             <button type="submit">Check Configs</button>
         </form>
