@@ -19,15 +19,20 @@ show_error() {
 update_panel() {
     echo "Updating SubPanel..."
     
-    # Backup current database and config
-    cp "$DB_PATH" "${DB_PATH}.backup"
-    cp "$CONFIG_FILE_PATH" "${CONFIG_FILE_PATH}.backup"
+    # Define repository URL
+    repo_url="https://github.com/smaghili/SubPanel2.git"
     
     # Clone and update files
     git clone "$repo_url" temp_dir
+    if [ $? -ne 0 ]; then
+        show_error "Failed to clone repository"
+    fi
     
     # Update files while preserving data
     cd temp_dir
+    if [ $? -ne 0 ]; then
+        show_error "Failed to enter temp directory"
+    fi
     for file in *; do
         if [[ "$file" == *.py ]]; then
             cp "$file" "$SCRIPTS_DIR/"
