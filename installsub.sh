@@ -36,9 +36,9 @@ update_panel() {
         show_error "Failed to enter temp directory"
     fi
     
-    # Fetch the latest changes
-    git fetch origin
-    git pull origin main  # or the appropriate branch
+    # Fetch the latest changes quietly
+    git fetch origin --quiet
+    git pull origin main --quiet  # or the appropriate branch
     
     updated_files=()  # Array to keep track of updated files
     
