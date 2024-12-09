@@ -25,7 +25,8 @@ update_panel() {
     # Define paths
     WEB_ROOT="/var/www/html"
     SCRIPTS_DIR="/var/www/scripts"
-    
+    COMMIT_FILE="/var/www/config/last_commit.txt"  # File to store the last commit hash
+
     # Check if the repository already exists
     if [ ! -d "SubPanel2" ]; then
         git clone "$repo_url" SubPanel2
@@ -40,45 +41,63 @@ update_panel() {
     git fetch origin
     git pull origin main  # or the appropriate branch
     
-    updated_files=()  # Array to keep track of updated files
+    # Get the latest commit hash
+    latest_commit=$(git rev-parse HEAD)
     
-    for file in *; do
-        if [[ "$file" == *.py ]]; then
-            if ! git diff --quiet HEAD -- "$file"; then
+    # Check if the commit file exists
+    if [ -f "$COMMIT_FILE" ]; then
+        # Read the last commit hash from the file
+        last_commit=$(cat "$COMMIT_FILE")
+    else
+        last_commit=""
+    fi
+
+    # Compare the latest commit with the last commit
+    if [ "$latest_commit" != "$last_commit" ]; then
+        echo "New updates found. Updating files..."
+        
+        updated_files=()  # Array to keep track of updated files
+        
+        # Copy files to their respective directories
+        for file in *; do
+            if [[ "$file" == *.py ]]; then
                 cp "$file" "$SCRIPTS_DIR/"
                 chmod +x "$SCRIPTS_DIR/$file"
                 updated_files+=("$file")  # Add to updated files
-            fi
-        elif [ "$file" != "installsub.sh" ]; then
-            if ! git diff --quiet HEAD -- "$file"; then
+            elif [ "$file" != "installsub.sh" ]; then
                 cp "$file" "$WEB_ROOT/"
                 updated_files+=("$file")  # Add to updated files
             fi
+        done
+        
+        # Update the last commit hash in the file
+        echo "$latest_commit" > "$COMMIT_FILE"
+        
+        cd ..
+        
+        # Check if any files were updated
+        if [ ${#updated_files[@]} -eq 0 ]; then
+            echo "You are using the latest version."
+        else
+            echo "The following files have been updated:"
+            printf '%s\n' "${updated_files[@]}"
         fi
-    done
-    
-    cd ..
-    
-    # Check if any files were updated
-    if [ ${#updated_files[@]} -eq 0 ]; then
-        echo "You are using the latest version."
+        
+        # Fix permissions
+        sudo chown -R www-data:www-data $WEB_ROOT $SCRIPTS_DIR
+        sudo chmod -R 755 $WEB_ROOT
+        sudo chmod -R 775 $SCRIPTS_DIR
+        
+        # Restart services
+        systemctl restart monitor-bot.service
+        systemctl restart v2raycheck.service
+        systemctl restart nginx
+        systemctl restart $PHP_FPM_SERVICE
+        
+        echo "Update completed successfully!"
     else
-        echo "The following files have been updated:"
-        printf '%s\n' "${updated_files[@]}"
+        echo "No new updates available."
     fi
-    
-    # Fix permissions
-    sudo chown -R www-data:www-data $WEB_ROOT $SCRIPTS_DIR
-    sudo chmod -R 755 $WEB_ROOT
-    sudo chmod -R 775 $SCRIPTS_DIR
-    
-    # Restart services
-    systemctl restart monitor-bot.service
-    systemctl restart v2raycheck.service
-    systemctl restart nginx
-    systemctl restart $PHP_FPM_SERVICE
-    
-    echo "Update completed successfully!"
 }
 
 # Function to completely reinstall panel
