@@ -331,6 +331,11 @@ if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
     systemctl start nginx
 fi
 
+# Install git if not already installed
+if ! command -v git &> /dev/null; then
+    sudo apt install -y git
+fi
+
 # Clone the GitHub repository
 repo_url="https://github.com/smaghili/SubPanel2.git"
 git clone "$repo_url" temp_dir
