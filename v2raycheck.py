@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Finland": "🇫🇮",
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
-    "Spain": "��🇸",
+    "Spain": "🇪🇸",
     "Belgium": "🇧🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
@@ -565,10 +565,16 @@ async def test_config(config: str, port: int) -> Dict:
             os.chmod(json_filename, 0o664)
         
         return {**result, "config": config}
+    except Exception as e:
+        return {"status": "error", "config": config, "error": str(e)}
+    finally:
+        # پاکسازی فایل‌های موقت
+        if os.path.exists(f"config_{port}.json"):
+            os.remove(f"config_{port}.json")
 
 async def test_config_batch(configs: List[str], start_port: int = 1080, batch_size: int = 40, 
-                            save_path: str = "working_configs.txt", position: str = "end",
-                            sort_by_ping: bool = False, name_suffix: str = None, checkname: bool = False):
+                           save_path: str = "working_configs.txt", position: str = "end",
+                           sort_by_ping: bool = False, name_suffix: str = None, checkname: bool = False):
     """Test a batch of configs simultaneously and optionally sort by ping"""
     config_counter.reset()
     
