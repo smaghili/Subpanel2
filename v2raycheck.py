@@ -15,8 +15,6 @@ from urllib.parse import urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
 from collections import defaultdict
-from datetime import datetime
-import logging
 
 COUNTRY_EMOJIS = {
     "Iran": "🇮🇷",
@@ -41,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
     "Spain": "🇪🇸",
-    "Belgium": "🇧🇪",
+    "Belgium": "���🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
     "United Arab Emirates": "🇦🇪",
@@ -973,45 +971,146 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
                 continue
 
             try:
-                # Handle vmess:// format
+                # پردازش همه پروتکل‌ها
                 if config.startswith('vmess://'):
                     config_json = json.loads(base64.b64decode(config[8:]).decode('utf-8'))
+                    protocol = "vmess"
+                elif config.startswith('vless://'):
+                    config_json = parse_vless(config)
+                    protocol = "vless"
+                elif config.startswith('trojan://'):
+                    config_json = parse_trojan(config)
+                    protocol = "trojan"
+                elif config.startswith('ss://'):
+                    config_json = parse_shadowsocks(config)
+                    protocol = "shadowsocks"
                 else:
-                    continue  # Skip non-vmess configs for now
+                    continue
 
                 tag = f"proxy_{i}"
                 outbound = {
                     "tag": tag,
-                    "protocol": "vmess",
-                    "settings": {
-                        "vnext": [
-                            {
-                                "address": config_json.get("add", ""),
-                                "port": int(config_json.get("port", 0)),
-                                "users": [
-                                    {
-                                        "id": config_json.get("id", ""),
-                                        "alterId": int(config_json.get("aid", 0)),
-                                        "security": config_json.get("scy", "auto")
-                                    }
-                                ]
-                            }
-                        ]
-                    },
+                    "protocol": protocol,
+                    "settings": {},
                     "streamSettings": {
-                        "network": config_json.get("net", "tcp"),
-                        "security": config_json.get("tls", "none"),
-                        "tlsSettings": {
-                            "serverName": config_json.get("sni", "")
-                        } if config_json.get("tls") else {},
-                        "wsSettings": {
-                            "path": config_json.get("path", ""),
-                            "headers": {
-                                "Host": config_json.get("host", "")
-                            }
-                        } if config_json.get("net") == "ws" else {}
+                        "network": config_json.get("net", "") or config_json.network,
+                        "security": config_json.get("tls", "") or config_json.security,
                     }
                 }
+                
+                # تنظیم settings بر اساس نوع پروتکل
+                if protocol == "vmess":
+                    outbound["settings"] = {
+                        "vnext": [{
+                            "address": config_json.get("add", ""),
+                            "port": int(config_json.get("port", 0)),
+                            "users": [{
+                                "id": config_json.get("id", ""),
+                                "alterId": int(config_json.get("aid", 0)),
+                                "security": config_json.get("scy", "auto")
+                            }]
+                        }]
+                    }
+                    # اضافه کردن تنظیمات stream برای vmess
+                    if outbound["streamSettings"]["network"] == "ws":
+                        outbound["streamSettings"]["wsSettings"] = {
+                            "path": config_json.get("path", ""),
+                            "headers": {"Host": config_json.get("host", "")}
+                        }
+                    elif outbound["streamSettings"]["network"] == "grpc":
+                        outbound["streamSettings"]["grpcSettings"] = {
+                            "serviceName": config_json.get("serviceName", "")
+                        }
+                    elif outbound["streamSettings"]["network"] == "http":
+                        outbound["streamSettings"]["httpSettings"] = {
+                            "path": config_json.get("path", ""),
+                            "host": config_json.get("host", "").split(",")
+                        }
+                    elif outbound["streamSettings"]["network"] == "httpupgrade":
+                        outbound["streamSettings"]["httpupgradeSettings"] = {
+                            "path": config_json.get("path", ""),
+                            "host": config_json.get("host", "")
+                        }
+                elif protocol == "vless":
+                    outbound["settings"] = {
+                        "vnext": [{
+                            "address": config_json.server,
+                            "port": config_json.port,
+                            "users": [{
+                                "id": config_json.uuid,
+                                "encryption": config_json.encryption,
+                                "flow": config_json.flow if config_json.flow else ""
+                            }]
+                        }]
+                    }
+                    # اضافه کردن تنظیمات stream برای vless
+                    if outbound["streamSettings"]["network"] == "ws":
+                        outbound["streamSettings"]["wsSettings"] = {
+                            "path": config_json.path,
+                            "headers": {"Host": config_json.host}
+                        }
+                    elif outbound["streamSettings"]["network"] == "grpc":
+                        outbound["streamSettings"]["grpcSettings"] = {
+                            "serviceName": config_json.grpc_service_name
+                        }
+                    elif outbound["streamSettings"]["network"] == "http":
+                        outbound["streamSettings"]["httpSettings"] = {
+                            "path": config_json.path,
+                            "host": config_json.host.split(",") if config_json.host else []
+                        }
+                    elif outbound["streamSettings"]["network"] == "httpupgrade":
+                        outbound["streamSettings"]["httpupgradeSettings"] = {
+                            "path": config_json.path,
+                            "host": config_json.host
+                        }
+                    # اضافه کردن تنظیمات Reality
+                    if config_json.security == "reality":
+                        outbound["streamSettings"]["realitySettings"] = {
+                            "publicKey": config_json.pbk,
+                            "shortId": config_json.sid,
+                            "serverName": config_json.sni,
+                            "fingerprint": config_json.fp or "chrome"
+                        }
+                    elif config_json.security == "tls":
+                        outbound["streamSettings"]["tlsSettings"] = {
+                            "serverName": config_json.sni,
+                            "fingerprint": config_json.fp or "chrome",
+                            "alpn": config_json.alpn.split(",") if config_json.alpn else []
+                        }
+                elif protocol == "trojan":
+                    outbound["settings"] = {
+                        "servers": [{
+                            "address": config_json.server,
+                            "port": config_json.port,
+                            "password": config_json.password
+                        }]
+                    }
+                    # اضافه کردن تنظیمات stream برای trojan
+                    if outbound["streamSettings"]["network"] == "ws":
+                        outbound["streamSettings"]["wsSettings"] = {
+                            "path": config_json.path,
+                            "headers": {"Host": config_json.host}
+                        }
+                    elif outbound["streamSettings"]["network"] == "grpc":
+                        outbound["streamSettings"]["grpcSettings"] = {
+                            "serviceName": config_json.grpc_service_name
+                        }
+                    # تنظیمات TLS برای Trojan
+                    if config_json.security == "tls":
+                        outbound["streamSettings"]["tlsSettings"] = {
+                            "serverName": config_json.sni,
+                            "fingerprint": config_json.fp or "chrome",
+                            "alpn": config_json.alpn.split(",") if config_json.alpn else []
+                        }
+                elif protocol == "shadowsocks":
+                    outbound["settings"] = {
+                        "servers": [{
+                            "address": config_json.server,
+                            "port": config_json.port,
+                            "method": config_json.method,
+                            "password": config_json.password
+                        }]
+                    }
 
                 loadbalancer_config["outbounds"].append(outbound)
                 loadbalancer_config["routing"]["balancers"][0]["selector"].append(tag)
