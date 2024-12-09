@@ -975,7 +975,7 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
         # Process each config
         valid_configs = 0
         for i, config in enumerate(configs):
-            if not config.strip():
+            if not config or (isinstance(config, str) and not config.strip()):
                 continue
             
             try:
