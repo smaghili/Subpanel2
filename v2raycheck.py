@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Finland": "🇫🇮",
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
-    "Spain": "��🇸",
+    "Spain": "🇪🇸",
     "Belgium": "🇧🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
@@ -413,12 +413,14 @@ def config_to_json(config_url: str, inbound_port: int = 1080, output_filename: s
         }]
     
     # Save to output JSON file
-    # ایجاد نام فایل با timestamp برای منحصر به فرد بودن
     timestamp = int(time.time())
     json_filename = f"/var/www/config/json_configs/{config.type}_{timestamp}.json"
     
+    os.makedirs(os.path.dirname(json_filename), exist_ok=True)
+    
     with open(json_filename, 'w') as f:
         json.dump(xray_config, f, indent=2)
+    os.chmod(json_filename, 0o664)
     
     return xray_config
 
