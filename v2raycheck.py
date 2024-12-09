@@ -979,6 +979,57 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
                 continue
             
             try:
+                # اگر کانفیگ دیکشنری است، آن را به رشته تبدیل کنیم
+                if isinstance(config, dict):
+                    if config.get("protocol") == "vmess":
+                        vmess_config = {
+                            "v": "2",
+                            "ps": config.get("ps", ""),
+                            "add": config.get("add", ""),
+                            "port": config.get("port", ""),
+                            "id": config.get("id", ""),
+                            "aid": config.get("aid", "0"),
+                            "net": config.get("net", ""),
+                            "type": config.get("type", ""),
+                            "host": config.get("host", ""),
+                            "path": config.get("path", ""),
+                            "tls": config.get("tls", ""),
+                            "sni": config.get("sni", ""),
+                            "scy": config.get("scy", "auto")
+                        }
+                        config = "vmess://" + base64.b64encode(json.dumps(vmess_config).encode()).decode()
+                    elif config.get("protocol") == "vless":
+                        vless_params = {
+                            "type": config.get("net", ""),
+                            "security": config.get("security", ""),
+                            "path": config.get("path", ""),
+                            "host": config.get("host", ""),
+                            "sni": config.get("sni", ""),
+                            "fp": config.get("fp", ""),
+                            "pbk": config.get("pbk", ""),
+                            "sid": config.get("sid", ""),
+                            "spx": config.get("spx", ""),
+                            "flow": config.get("flow", "")
+                        }
+                        params_str = "&".join(f"{k}={v}" for k, v in vless_params.items() if v)
+                        config = f"vless://{config.get('id')}@{config.get('add')}:{config.get('port')}?{params_str}"
+                    elif config.get("protocol") == "trojan":
+                        trojan_params = {
+                            "type": config.get("net", ""),
+                            "security": config.get("security", ""),
+                            "path": config.get("path", ""),
+                            "host": config.get("host", ""),
+                            "sni": config.get("sni", ""),
+                            "fp": config.get("fp", "")
+                        }
+                        params_str = "&".join(f"{k}={v}" for k, v in trojan_params.items() if v)
+                        config = f"trojan://{config.get('password')}@{config.get('add')}:{config.get('port')}?{params_str}"
+                    elif config.get("protocol") == "shadowsocks":
+                        method_password = base64.b64encode(f"{config.get('method')}:{config.get('password')}".encode()).decode()
+                        config = f"ss://{method_password}@{config.get('add')}:{config.get('port')}"
+                    else:
+                        continue
+                
                 # پردازش همه پروتکل‌ها
                 if config.startswith('vmess://'):
                     config_json = json.loads(base64.b64decode(config[8:]).decode('utf-8'))
