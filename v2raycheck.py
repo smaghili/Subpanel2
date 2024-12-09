@@ -950,10 +950,9 @@ def priority_key(config: str) -> int:
     else:
         return 3
 
-def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="LoadBalancer-Hamshahri"):
+def create_loadbalancer_config(output_file="loadbalancer.json", name="Xray-Load-Balancer (Surfboardv2ray)"):
     """
     Create a load balancer config from multiple working configs
-    configs: List of JSON configurations
     """
     try:
         loadbalancer_config = {
@@ -967,7 +966,7 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
                 {
                     "tag": "socks",
                     "port": 10808,
-                    "listen": "127.0.0.1",
+                    "listen": "0.0.0.0",
                     "protocol": "socks",
                     "sniffing": {
                         "enabled": True,
@@ -983,7 +982,7 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
                 {
                     "tag": "http",
                     "port": 10809,
-                    "listen": "127.0.0.1",
+                    "listen": "0.0.0.0",
                     "protocol": "http",
                     "sniffing": {
                         "enabled": True,
@@ -995,99 +994,95 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
                         "udp": True,
                         "allowTransparent": False
                     }
+                },
+                {
+                    "tag": "api",
+                    "port": 10813,
+                    "listen": "127.0.0.1",
+                    "protocol": "dokodemo-door",
+                    "settings": {
+                        "udp": False,
+                        "address": "127.0.0.1",
+                        "allowTransparent": False
+                    }
                 }
             ],
             "outbounds": [],
+            "stats": {},
+            "api": {
+                "tag": "api",
+                "services": ["StatsService"]
+            },
+            "policy": {
+                "system": {
+                    "statsOutboundUplink": True,
+                    "statsOutboundDownlink": True
+                }
+            },
+            "burstObservatory": {
+                "pingConfig": {
+                    "connectivity": "http://connectivitycheck.platform.hicloud.com/generate_204",
+                    "destination": "http://www.google.com/gen_204",
+                    "interval": "15m",
+                    "sampling": 10,
+                    "timeout": "3s"
+                },
+                "subjectSelector": [],  # Will be filled dynamically
+            },
+            "dns": {
+                "hosts": {
+                    "domain:googleapis.cn": "googleapis.com"
+                },
+                "servers": ["1.1.1.1"]
+            },
             "routing": {
-                "domainStrategy": "IPOnDemand",
-                "rules": [],
                 "balancers": [
                     {
-                        "tag": "balancer",
-                        "selector": []
+                        "selector": [],  # Will be filled dynamically
+                        "strategy": {
+                            "type": "leastLoad"
+                        },
+                        "tag": "xray-load-balancer"
+                    }
+                ],
+                "domainMatcher": "hybrid",
+                "domainStrategy": "IPIfNonMatch",
+                "rules": [
+                    {
+                        "balancerTag": "xray-load-balancer",
+                        "inboundTag": ["socks", "http"],
+                        "type": "field"
                     }
                 ]
             }
         }
 
-        # Process each config
-        for i, config in enumerate(configs):
-            if not config.strip():
-                continue
-
-            try:
-                # Handle vmess:// format
-                if config.startswith('vmess://'):
-                    config_json = json.loads(base64.b64decode(config[8:]).decode('utf-8'))
-                else:
-                    continue  # Skip non-vmess configs for now
-
-                tag = f"proxy_{i}"
+        # Read existing configs from the specified directory
+        config_directory = "/var/www/config/json_configs"
+        config_files = [f for f in os.listdir(config_directory) if f.endswith('.json')]
+        
+        for index, config_file in enumerate(config_files):
+            with open(os.path.join(config_directory, config_file), 'r') as f:
+                config_data = json.load(f)
+                # Add the existing outbound config to the load balancer config
                 outbound = {
-                    "tag": tag,
-                    "protocol": "vmess",
-                    "settings": {
-                        "vnext": [
-                            {
-                                "address": config_json.get("add", ""),
-                                "port": int(config_json.get("port", 0)),
-                                "users": [
-                                    {
-                                        "id": config_json.get("id", ""),
-                                        "alterId": int(config_json.get("aid", 0)),
-                                        "security": config_json.get("scy", "auto")
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    "streamSettings": {
-                        "network": config_json.get("net", "tcp"),
-                        "security": config_json.get("tls", "none"),
-                        "tlsSettings": {
-                            "serverName": config_json.get("sni", "")
-                        } if config_json.get("tls") else {},
-                        "wsSettings": {
-                            "path": config_json.get("path", ""),
-                            "headers": {
-                                "Host": config_json.get("host", "")
-                            }
-                        } if config_json.get("net") == "ws" else {}
-                    }
+                    "tag": f"proxy-{index + 1}",
+                    "protocol": config_data.get("protocol", "vless"),  # Default to "vless" if not specified
+                    "settings": config_data.get("settings", {}),
+                    "streamSettings": config_data.get("streamSettings", {}),
+                    "mux": config_data.get("mux", {"enabled": False, "concurrency": -1})  # Default mux settings
                 }
-
                 loadbalancer_config["outbounds"].append(outbound)
-                loadbalancer_config["routing"]["balancers"][0]["selector"].append(tag)
 
-            except (json.JSONDecodeError, UnicodeDecodeError, KeyError) as e:
-                print(f"Error processing config {i}: {str(e)}")
-                continue
+        # Update subjectSelector and selector based on the number of outbounds
+        loadbalancer_config["burstObservatory"]["subjectSelector"] = [f"proxy-{i + 1}" for i in range(len(loadbalancer_config["outbounds"]))]
+        loadbalancer_config["routing"]["balancers"][0]["selector"] = [f"proxy-{i + 1}" for i in range(len(loadbalancer_config["outbounds"]))]
 
-        # Add balancer outbound
-        loadbalancer_config["routing"]["rules"].append({
-            "type": "field",
-            "balancerTag": "balancer",
-            "outboundTag": "direct",
-            "network": "tcp,udp"
+        # Add the freedom outbound
+        loadbalancer_config["outbounds"].append({
+            "protocol": "freedom",
+            "tag": "direct-out"
         })
-
-        # Add direct and blackhole outbounds
-        loadbalancer_config["outbounds"].extend([
-            {
-                "tag": "direct",
-                "protocol": "freedom",
-                "settings": {}
-            },
-            {
-                "tag": "blackhole",
-                "protocol": "blackhole",
-                "settings": {}
-            }
-        ])
-
-        # Verify we have at least one valid outbound
-        if not loadbalancer_config["routing"]["balancers"][0]["selector"]:
-            raise Exception("No valid configs found for load balancer")
 
         # Write the config to file
         with open(output_file, 'w') as f:
