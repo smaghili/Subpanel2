@@ -45,6 +45,7 @@ function update_user_configs($db, $user_id, $config_limit) {
     
     if ($return_var === 0 && file_exists($loadbalancer_output_file)) {
         $loadbalancer_content = file_get_contents($loadbalancer_output_file);
+        error_log("Loadbalancer content: " . $loadbalancer_content);
         if ($loadbalancer_content && ($json = json_decode($loadbalancer_content, true)) !== null) {
             if (isset($json['inbounds']) && isset($json['outbounds']) && isset($json['routing'])) {
                 $loadbalancer_encoded = base64_encode($loadbalancer_content);

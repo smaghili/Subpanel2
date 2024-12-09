@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Finland": "🇫🇮",
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
-    "Spain": "��🇸",
+    "Spain": "🇪🇸",
     "Belgium": "🇧🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
@@ -1158,6 +1158,7 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
 
         # Write the config to file
         with open(output_file, 'w') as f:
+            json.dumps(loadbalancer_config)  # تست اعتبارسنجی
             json.dump(loadbalancer_config, f, indent=4)
         os.chmod(output_file, 0o664)  # اعطای دسترسی مناسب به فایل
 
