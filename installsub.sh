@@ -1,24 +1,13 @@
 #!/bin/bash
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    echo -e "\e[31m[ERROR] Please run as root (use sudo)\e[0m"
-    exit 1
-fi
-
-# Function to check and install dependencies
-check_dependencies() {
-    local deps=(nginx certbot python3 php sqlite3 curl)
-    for dep in "${deps[@]}"; do
-        if ! command -v $dep &> /dev/null; then
-            echo "Installing $dep..."
-            apt update && apt install -y $dep
-        fi
-    done
+# Function to check if panel is already installed
+check_installation() {
+    if [ -f "/etc/nginx/sites-available/$DOMAIN_NAME" ] || [ -d "$WEB_ROOT" ]; then
+        return 0
+    else
+        return 1
+    fi
 }
-
-# Check dependencies before installation
-check_dependencies
 
 # Function to show errors and exit
 show_error() {
@@ -74,62 +63,21 @@ reinstall_panel() {
     fi
     
     # Stop services
-    systemctl stop nginx || true
-    systemctl stop monitor-bot.service || true
-    systemctl stop v2raycheck.service || true
+    systemctl stop nginx
+    systemctl stop monitor-bot.service
+    systemctl stop v2raycheck.service
     
-    # Clean up all nginx configurations
-    rm -f /etc/nginx/sites-enabled/* || true
-    rm -f /etc/nginx/sites-available/* || true
-    
-    # Reset nginx.conf to default
-    cat << EOF > /etc/nginx/nginx.conf
-    user www-data;
-    worker_processes auto;
-    pid /run/nginx.pid;
-    include /etc/nginx/modules-enabled/*.conf;
-    
-    events {
-        worker_connections 768;
-    }
-    
-    http {
-        sendfile on;
-        tcp_nopush on;
-        types_hash_max_size 2048;
-        include /etc/nginx/mime.types;
-        default_type application/octet-stream;
-        ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
-        ssl_prefer_server_ciphers on;
-        access_log /var/log/nginx/access.log;
-        error_log /var/log/nginx/error.log;
-        gzip on;
-        include /etc/nginx/conf.d/*.conf;
-        include /etc/nginx/sites-enabled/*;
-    }
-    EOF
-    
-    # Remove SSL certificates for both old and new domains
-    for domain in "ssd.hamshahri2.org" "$DOMAIN_NAME"; do
-        if [ -d "/etc/letsencrypt/live/$domain" ]; then
-            certbot delete --cert-name $domain --non-interactive || true
-        fi
-    done
+    # Remove SSL certificates
+    certbot delete --cert-name $DOMAIN_NAME --non-interactive
     
     # Remove all panel files and directories
-    rm -rf $WEB_ROOT/* || true
-    rm -rf $DB_DIR/* || true
-    rm -rf $CONFIG_DIR/* || true
-    rm -rf $SCRIPTS_DIR/* || true
-    rm -rf $SESSIONS_DIR/* || true
-    
-    # Remove systemd services
-    rm -f /etc/systemd/system/monitor-bot.service || true
-    rm -f /etc/systemd/system/v2raycheck.service || true
-    systemctl daemon-reload
-    
-    # Clean PHP sessions
-    rm -rf /var/lib/php/sessions/* || true
+    rm -rf $WEB_ROOT
+    rm -rf $DB_DIR
+    rm -rf $CONFIG_DIR
+    rm -rf $SCRIPTS_DIR
+    rm -rf $SESSIONS_DIR
+    rm -f /etc/nginx/sites-available/$DOMAIN_NAME
+    rm -f /etc/nginx/sites-enabled/$DOMAIN_NAME
     
     echo "All panel data has been removed. Starting fresh installation..."
     sleep 2
@@ -137,21 +85,12 @@ reinstall_panel() {
 
 LOG_FILE="/var/log/subpanel_install.log"
 exec 1> >(tee -a "$LOG_FILE") 2>&1
-echo "----------------------------------------"
 echo "Installation started at $(date)"
-echo "System: $(uname -a)"
-echo "----------------------------------------"
 
 # Define paths
 WEB_ROOT="/var/www/html"
 DB_DIR="/var/www/db"
 CONFIG_DIR="/var/www/config"
-SCRIPTS_DIR="/var/www/scripts"
-SESSIONS_DIR="/var/www/sessions"
-LOADBALANCER_DIR="/var/www/html/loadbalancer"
-DB_PATH="${DB_DIR}/subscriptions.db"
-CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
-BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
 
 # First check if panel is already installed
 if [ -d "$WEB_ROOT" ] || [ -d "$DB_DIR" ] || [ -d "$CONFIG_DIR" ]; then
@@ -192,6 +131,15 @@ fi
 echo "Using domain: $DOMAIN_NAME"
 echo "Installation will begin in 3 seconds... Press Ctrl+C to cancel"
 sleep 3
+
+DB_DIR="/var/www/db"
+CONFIG_DIR="/var/www/config"
+DB_PATH="${DB_DIR}/subscriptions.db"
+CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
+BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
+SCRIPTS_DIR="/var/www/scripts"
+SESSIONS_DIR="/var/www/sessions"
+LOADBALANCER_DIR="/var/www/html/loadbalancer"
 
 sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR $SESSIONS_DIR $LOADBALANCER_DIR
 
@@ -321,9 +269,7 @@ if [ ! -f "$SCRIPTS_DIR/telegram-session.py" ]; then
     show_error "telegram-session.py not found in $SCRIPTS_DIR"
 fi
 
-if ! python3 $SCRIPTS_DIR/telegram-session.py; then
-    show_error "Failed to create Telegram session"
-fi
+python3 $SCRIPTS_DIR/telegram-session.py
 
 # Remove default nginx config and create symlink
 rm -f /etc/nginx/sites-enabled/default
@@ -342,11 +288,6 @@ if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
     
     # Start nginx again
     systemctl start nginx
-fi
-
-# Install git if not already installed
-if ! command -v git &> /dev/null; then
-    sudo apt install -y git
 fi
 
 # Clone the GitHub repository
@@ -497,17 +438,7 @@ WantedBy=multi-user.target
 EOF
 
 # Enable and start services
-systemctl enable monitor-bot.service || show_error "Failed to enable monitor-bot service"
-systemctl enable v2raycheck.service || show_error "Failed to enable v2raycheck service"
-systemctl start monitor-bot.service || show_error "Failed to start monitor-bot service"
-systemctl start v2raycheck.service || show_error "Failed to start v2raycheck service"
-
-# Cleanup function
-cleanup() {
-    echo "Cleaning up..."
-    rm -rf temp_dir
-    systemctl restart nginx
-}
-
-# Set trap for cleanup
-trap cleanup EXIT
+systemctl enable monitor-bot.service
+systemctl enable v2raycheck.service
+systemctl start monitor-bot.service
+systemctl start v2raycheck.service
