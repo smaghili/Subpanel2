@@ -87,14 +87,13 @@ LOG_FILE="/var/log/subpanel_install.log"
 exec 1> >(tee -a "$LOG_FILE") 2>&1
 echo "Installation started at $(date)"
 
-read -p "Please enter your domain name (e.g., example.com): " DOMAIN_NAME
+# Define paths
+WEB_ROOT="/var/www/html"
+DB_DIR="/var/www/db"
+CONFIG_DIR="/var/www/config"
 
-if [[ ! $DOMAIN_NAME =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
-    show_error "Invalid domain name format\nDomain name should be in format: example.com or sub.example.com"
-fi
-
-# Check if panel is already installed
-if check_installation; then
+# First check if panel is already installed
+if [ -d "$WEB_ROOT" ] || [ -d "$DB_DIR" ] || [ -d "$CONFIG_DIR" ]; then
     echo "SubPanel is already installed!"
     echo "Please choose an option:"
     echo "1) Update panel (preserves all data)"
@@ -110,6 +109,7 @@ if check_installation; then
             ;;
         2)
             reinstall_panel
+            # Continue with fresh installation after cleanup
             ;;
         3)
             echo "Exiting..."
@@ -121,11 +121,17 @@ if check_installation; then
     esac
 fi
 
+# Ask for domain name after checking installation status
+read -p "Please enter your domain name (e.g., example.com): " DOMAIN_NAME
+
+if [[ ! $DOMAIN_NAME =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
+    show_error "Invalid domain name format\nDomain name should be in format: example.com or sub.example.com"
+fi
+
 echo "Using domain: $DOMAIN_NAME"
 echo "Installation will begin in 3 seconds... Press Ctrl+C to cancel"
 sleep 3
 
-WEB_ROOT="/var/www/html"
 DB_DIR="/var/www/db"
 CONFIG_DIR="/var/www/config"
 DB_PATH="${DB_DIR}/subscriptions.db"
