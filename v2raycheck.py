@@ -412,15 +412,20 @@ def config_to_json(config_url: str, inbound_port: int = 1080, output_filename: s
             "password": config.password
         }]
     
-    # Save to output JSON file
-    timestamp = int(time.time())
-    json_filename = f"/var/www/config/json_configs/{config.type}_{timestamp}.json"
+    unique_number = config_counter.get_next_number("configjson")  # استفاده از کلید "configjson"
+    json_filename = f"/var/www/config/json_configs/ConfigToJson-{unique_number}.json"
     
+
     os.makedirs(os.path.dirname(json_filename), exist_ok=True)
     
-    with open(json_filename, 'w') as f:
-        json.dump(xray_config, f, indent=2)
-    os.chmod(json_filename, 0o664)
+    try:
+        with open(json_filename, 'w') as f:
+            json.dump(xray_config, f, indent=2)
+        os.chmod(json_filename, 0o664)
+        print(f"JSON config saved to {json_filename}")
+    except Exception as e:
+        print(f"Error saving JSON config: {str(e)}")
+        return {"error": "Failed to save JSON config"}
     
     return xray_config
 
