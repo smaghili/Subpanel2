@@ -1298,7 +1298,7 @@ async def main():
                     create_loadbalancer_config(successful_configs, args.lb_output, args.lb_name)
                     print(f"Load balancer configuration saved to: {args.lb_output}")
                 else:
-                    print("No working configs found for load balancer!")
+                    print("No working configs found for load balancer!!!!!!")
 
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
