@@ -26,10 +26,9 @@ update_panel() {
     WEB_ROOT="/var/www/html"
     SCRIPTS_DIR="/var/www/scripts"
     
-    # Clone and update files
-    git clone "$repo_url" temp_dir
-    if [ $? -ne 0 ]; then
-        show_error "Failed to clone repository"
+    # Clone the repository if it doesn't exist
+    if [ ! -d "temp_dir" ]; then
+        git clone "$repo_url" temp_dir
     fi
     
     # Update files while preserving data
@@ -38,13 +37,20 @@ update_panel() {
         show_error "Failed to enter temp directory"
     fi
     
+    # Fetch the latest changes
+    git fetch origin
+    git checkout main  # or the appropriate branch
+    git pull origin main  # or the appropriate branch
+    
     updated_files=()  # Array to keep track of updated files
     
     for file in *; do
         if [[ "$file" == *.py ]]; then
-            cp "$file" "$SCRIPTS_DIR/"
-            chmod +x "$SCRIPTS_DIR/$file"
-            updated_files+=("$file")  # Add to updated files
+            if ! git diff --quiet HEAD -- "$file"; then
+                cp "$file" "$SCRIPTS_DIR/"
+                chmod +x "$SCRIPTS_DIR/$file"
+                updated_files+=("$file")  # Add to updated files
+            fi
         elif [ "$file" != "installsub.sh" ]; then
             if ! git diff --quiet HEAD -- "$file"; then
                 cp "$file" "$WEB_ROOT/"
