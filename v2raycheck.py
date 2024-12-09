@@ -16,6 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
 from collections import defaultdict
 
+json_config_counter = 1  # شمارنده سراسری برای فایل‌های JSON
+
 COUNTRY_EMOJIS = {
     "Iran": "🇮🇷",
     "France": "🇫🇷",
@@ -546,12 +548,10 @@ async def test_config(
     position: str = "end",
     measure_latency: bool = False,
     name_suffix: str = None,
-    checkname: bool = False,
-    unique_id: int = None
+    checkname: bool = False
 ) -> Dict:
     """
-    Test a single configuration. If the config is working, save its JSON configuration
-    to a unique file named 'configtojson-{unique_id}.json' in the specified directory.
+    Test a single configuration.
     """
     process = None
     process_curl = None
@@ -582,7 +582,7 @@ async def test_config(
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
+
             try:
                 stdout, stderr = await asyncio.wait_for(process_curl.communicate(), timeout=15)
                 if stdout:
@@ -632,8 +632,7 @@ async def test_config(
                         
                         # Check for 'Hamshahri' in the existing name if checkname is True
                         if checkname and "Hamshahri" in existing_name:
-                            # Do not rename
-                            modified_config = config_url  # Keep original config without renaming
+                            modified_config = config_url
                         else:
                             new_name = generate_hamshahri_name(
                                 config_url, 
@@ -758,7 +757,6 @@ async def test_config_batch(
 ):
     """
     Test a batch of configs simultaneously and optionally sort by ping.
-    Now passes a unique_id to each test_config() call to generate unique filenames.
     """
     config_counter.reset()
     
@@ -767,7 +765,6 @@ async def test_config_batch(
     tasks = []
     for i, config in enumerate(configs):
         port = start_port + (i % batch_size)
-        unique_id = i + 1  # Unique ID starting from 1
         task = asyncio.create_task(test_config(
             config,
             port,
@@ -775,8 +772,7 @@ async def test_config_batch(
             position,
             measure_latency=sort_by_ping,
             name_suffix=name_suffix,
-            checkname=checkname,
-            unique_id=unique_id  # Pass the unique_id to test_config()
+            checkname=checkname
         ))
         tasks.append(task)
     
@@ -785,7 +781,7 @@ async def test_config_batch(
     # Filter all successful results
     successful_results = [r for r in results if r["status"] == "success"]
     
-    # اضافه کردن خروجی برای check_configs.php
+    # اضافه کردن خرو��ی برای check_configs.php
     print(f"Valid configs: {len(successful_results)}")
     
     # Sort by ping if required
@@ -798,7 +794,7 @@ async def test_config_batch(
         existing_configs = []
         if os.path.exists(save_path):
             with open(save_path, 'r', encoding='utf-8') as f:
-                existing_configs = [line.strip() for line in f]
+                existing_configs = [line.strip() for line in f if line.strip()]
         
         # Extract base configs to avoid duplicates
         existing_base_configs = set()
@@ -808,11 +804,22 @@ async def test_config_batch(
         
         # Filter out duplicates from successful_results
         new_configs = []
+        json_save_directory = '/var/www/config/json_configs/'
+        os.makedirs(json_save_directory, exist_ok=True)
+
+        config_number = len(existing_configs) + 1  # شروع شماره‌گذاری از بعد کانفیگ‌های موجود
+        
         for result in successful_results:
             base_config = result['config'].split('#')[0]
             if base_config not in existing_base_configs:
                 new_configs.append(result['config'])
-                existing_base_configs.add(base_config)  # To prevent duplicates within the same run
+                existing_base_configs.add(base_config)
+
+                # ذخیره‌ی فایل JSON با شماره‌ی صحیح
+                json_filename = os.path.join(json_save_directory, f"configtojson-{config_number}.json")
+                with open(json_filename, 'w') as f:
+                    json.dump(result['config_json'], f, indent=2)
+                config_number += 1
             else:
                 # Optionally, update the existing config's name if needed
                 pass  # You can implement logic here if you want to update existing configs
