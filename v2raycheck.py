@@ -262,172 +262,164 @@ def parse_shadowsocks(url: str) -> ConfigData:
     except:
         return ConfigData(type="shadowsocks")
 
-def config_to_json(config_url: str, inbound_port: int = 1080, output_filename: str = "config_output.json") -> Dict:
+def config_to_json(config_url: str, inbound_port: int = 1080, output_filename: str = None) -> Dict:
     """Convert various config formats to Xray JSON format
     
     Args:
         config_url: The config URL string
         inbound_port: The port number for inbound SOCKS connection
+        output_filename: Optional filename for JSON output
     """
-    if config_url.startswith("vless://"):
-        config = parse_vless(config_url)
-    elif config_url.startswith("vmess://"):
-        config = parse_vmess(config_url)
-    elif config_url.startswith("trojan://"):
-        config = parse_trojan(config_url)
-    elif config_url.startswith("ss://"):
-        config = parse_shadowsocks(config_url)
-    else:
-        return {"error": "Unsupported config format"}
-    
-    xray_config = {
-        "inbounds": [{
-            "port": inbound_port,
-            "protocol": "socks",
-            "settings": {
-                "udp": True
+    try:
+        if config_url.startswith("vless://"):
+            config = parse_vless(config_url)
+        elif config_url.startswith("vmess://"):
+            config = parse_vmess(config_url)
+        elif config_url.startswith("trojan://"):
+            config = parse_trojan(config_url)
+        elif config_url.startswith("ss://"):
+            config = parse_shadowsocks(config_url)
+        else:
+            return {"error": "Unsupported config format"}
+
+        xray_config = {
+            "inbounds": [{
+                "port": inbound_port,
+                "protocol": "socks",
+                "settings": {
+                    "udp": True
+                }
+            }],
+            "outbounds": [{
+                "protocol": config.type,
+                "settings": {},
+                "streamSettings": {
+                    "network": config.network,
+                    "security": config.security,
+                }
+            }]
+        }
+
+        # Add TLS or XTLS settings if security is not none
+        if config.security != "none":
+            xray_config["outbounds"][0]["streamSettings"]["tlsSettings"] = {
+                "serverName": config.sni or config.host or config.server,
+                "fingerprint": config.fp or "firefox",
+                "alpn": [config.alpn] if config.alpn else [],
+                "allowInsecure": config.allowInsecure
             }
-        }],
-        "outbounds": [{
-            "protocol": config.type,
-            "settings": {},
-            "streamSettings": {
-                "network": config.network,
-                "security": config.security,
+        if config.xtls:
+            xray_config["outbounds"][0]["streamSettings"]["xtlsSettings"] = {
+                "serverName": config.sni or config.host or config.server
             }
-        }]
-    }
-    
-    # Add TLS or XTLS settings if security is not none
-    if config.security != "none":
-        xray_config["outbounds"][0]["streamSettings"]["tlsSettings"] = {
-            "serverName": config.sni or config.host or config.server,
-            "fingerprint": config.fp or "firefox",
-            "alpn": [config.alpn] if config.alpn else [],
-            "allowInsecure": config.allowInsecure
-        }
-    if config.xtls:
-        xray_config["outbounds"][0]["streamSettings"]["xtlsSettings"] = {
-            "serverName": config.sni or config.host or config.server
-        }
-    
-    # Handle Reality settings
-    if config.security == "reality":
-        xray_config["outbounds"][0]["streamSettings"]["realitySettings"] = {
-            "publicKey": config.pbk,
-            "shortId": config.sid,
-            "serverName": config.sni,
-            "fingerprint": config.fp or "firefox"
-        }
-    
-    # Handle different network types and settings
-    if config.network == "tcp" and config.headerType == "http":
-        xray_config["outbounds"][0]["streamSettings"]["tcpSettings"] = {
-            "header": {
-                "type": "http",
-                "request": {
-                    "version": "1.1",
-                    "method": "GET",
-                    "path": [config.path] if config.path else ["/"],
-                    "headers": {
-                        "Host": [config.host] if config.host else [],
-                        "User-Agent": [
-                            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36",
-                            "Mozilla/5.0 (iPhone; CPU iPhone OS 10_0_2 like Mac OS X) AppleWebKit/601.1 (KHTML, like Gecko) CriOS/53.0.2785.109 Mobile/14A456 Safari/601.1.46"
-                        ],
-                        "Accept-Encoding": ["gzip, deflate"],
-                        "Connection": ["keep-alive"],
-                        "Pragma": "no-cache"
+        
+        # Handle Reality settings
+        if config.security == "reality":
+            xray_config["outbounds"][0]["streamSettings"]["realitySettings"] = {
+                "publicKey": config.pbk,
+                "shortId": config.sid,
+                "serverName": config.sni,
+                "fingerprint": config.fp or "firefox"
+            }
+        
+        # Handle different network types and settings
+        if config.network == "tcp" and config.headerType == "http":
+            xray_config["outbounds"][0]["streamSettings"]["tcpSettings"] = {
+                "header": {
+                    "type": "http",
+                    "request": {
+                        "version": "1.1",
+                        "method": "GET",
+                        "path": [config.path] if config.path else ["/"],
+                        "headers": {
+                            "Host": [config.host] if config.host else [],
+                            "User-Agent": [
+                                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36",
+                                "Mozilla/5.0 (iPhone; CPU iPhone OS 10_0_2 like Mac OS X) AppleWebKit/601.1 (KHTML, like Gecko) CriOS/53.0.2785.109 Mobile/14A456 Safari/601.1.46"
+                            ],
+                            "Accept-Encoding": ["gzip, deflate"],
+                            "Connection": ["keep-alive"],
+                            "Pragma": "no-cache"
+                        }
                     }
                 }
             }
-        }
-    elif config.network == "http" or (config.type == "vless" and config.headerType == "http"):
-        # Handle both http and httpupgrade
-        xray_config["outbounds"][0]["streamSettings"]["httpSettings"] = {
-            "path": config.path.split(",")[0] if "," in config.path else config.path,  # Take first path if multiple
-            "host": config.host.split(",") if config.host else [],
-            "method": "GET"
-        }
-    elif config.network == "httpupgrade":
-        # Add httpupgradeSettings if network is httpupgrade
-        xray_config["outbounds"][0]["streamSettings"]["httpupgradeSettings"] = {
-            "path": config.path,
-            "host": config.host
-        }
-    elif config.network == "ws":
-        xray_config["outbounds"][0]["streamSettings"]["wsSettings"] = {
-            "path": config.path,
-            "headers": {
-                "Host": config.host or config.sni
+        elif config.network == "http" or (config.type == "vless" and config.headerType == "http"):
+            # Handle both http and httpupgrade
+            xray_config["outbounds"][0]["streamSettings"]["httpSettings"] = {
+                "path": config.path.split(",")[0] if "," in config.path else config.path,  # Take first path if multiple
+                "host": config.host.split(",") if config.host else [],
+                "method": "GET"
             }
-        }
-    elif config.network == "grpc":
-        xray_config["outbounds"][0]["streamSettings"]["grpcSettings"] = {
-            "serviceName": config.grpc_service_name,
-            "multiMode": False
-        }
-    elif config.network == "quic":
-        xray_config["outbounds"][0]["streamSettings"]["quicSettings"] = {
-            "security": config.security,
-            "key": config.password,
-            "header": {
-                "type": config.headerType
+        elif config.network == "httpupgrade":
+            # Add httpupgradeSettings if network is httpupgrade
+            xray_config["outbounds"][0]["streamSettings"]["httpupgradeSettings"] = {
+                "path": config.path,
+                "host": config.host
             }
-        }
-    
-    outbound_settings = xray_config["outbounds"][0]["settings"]
-    
-    if config.type == "vless":
-        outbound_settings["vnext"] = [{
-            "address": config.server,
-            "port": config.port,
-            "users": [{
-                "id": config.uuid,
-                "encryption": config.encryption,
-                "flow": config.flow if config.flow else ""
+        elif config.network == "ws":
+            xray_config["outbounds"][0]["streamSettings"]["wsSettings"] = {
+                "path": config.path,
+                "headers": {
+                    "Host": config.host or config.sni
+                }
+            }
+        elif config.network == "grpc":
+            xray_config["outbounds"][0]["streamSettings"]["grpcSettings"] = {
+                "serviceName": config.grpc_service_name,
+                "multiMode": False
+            }
+        elif config.network == "quic":
+            xray_config["outbounds"][0]["streamSettings"]["quicSettings"] = {
+                "security": config.security,
+                "key": config.password,
+                "header": {
+                    "type": config.headerType
+                }
+            }
+        
+        outbound_settings = xray_config["outbounds"][0]["settings"]
+        
+        if config.type == "vless":
+            outbound_settings["vnext"] = [{
+                "address": config.server,
+                "port": config.port,
+                "users": [{
+                    "id": config.uuid,
+                    "encryption": config.encryption,
+                    "flow": config.flow if config.flow else ""
+                }]
             }]
-        }]
-    elif config.type == "vmess":
-        outbound_settings["vnext"] = [{
-            "address": config.server,
-            "port": config.port,
-            "users": [{
-                "id": config.uuid,
-                "alterId": config.aid,
-                "security": "auto"
+        elif config.type == "vmess":
+            outbound_settings["vnext"] = [{
+                "address": config.server,
+                "port": config.port,
+                "users": [{
+                    "id": config.uuid,
+                    "alterId": config.aid,
+                    "security": "auto"
+                }]
             }]
-        }]
-    elif config.type == "trojan":
-        outbound_settings["servers"] = [{
-            "address": config.server,
-            "port": config.port,
-            "password": config.password
-        }]
-    elif config.type == "shadowsocks":
-        outbound_settings["servers"] = [{
-            "address": config.server,
-            "port": config.port,
-            "method": config.method,
-            "password": config.password
-        }]
-    
-    unique_number = config_counter.get_next_number("configjson")  # استفاده از کلید "configjson"
-    json_filename = f"/var/www/config/json_configs/ConfigToJson-{unique_number}.json"
-    
+        elif config.type == "trojan":
+            outbound_settings["servers"] = [{
+                "address": config.server,
+                "port": config.port,
+                "password": config.password
+            }]
+        elif config.type == "shadowsocks":
+            outbound_settings["servers"] = [{
+                "address": config.server,
+                "port": config.port,
+                "method": config.method,
+                "password": config.password
+            }]
+        
+        # Instead of saving immediately, return the config
+        return xray_config
 
-    os.makedirs(os.path.dirname(json_filename), exist_ok=True)
-    
-    try:
-        with open(json_filename, 'w') as f:
-            json.dump(xray_config, f, indent=2)
-        os.chmod(json_filename, 0o664)
-        print(f"JSON config saved to {json_filename}")
     except Exception as e:
-        print(f"Error saving JSON config: {str(e)}")
-        return {"error": "Failed to save JSON config"}
-    
-    return xray_config
+        print(f"Error generating config: {str(e)}")
+        return {"error": f"Failed to generate config: {str(e)}"}
 
 def fetch_subscription(url: str) -> List[str]:
     """Fetch and decode subscription link content"""
