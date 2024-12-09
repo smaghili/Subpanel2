@@ -19,6 +19,10 @@ show_error() {
 update_panel() {
     echo "Updating SubPanel..."
     
+    # Define paths
+    WEB_ROOT="/var/www/html"
+    SCRIPTS_DIR="/var/www/scripts"
+    
     # Define repository URL
     repo_url="https://github.com/smaghili/SubPanel2.git"
     
