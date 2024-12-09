@@ -26,20 +26,18 @@ update_panel() {
     WEB_ROOT="/var/www/html"
     SCRIPTS_DIR="/var/www/scripts"
     
-    # Clone the repository if it doesn't exist
-    if [ ! -d "temp_dir" ]; then
-        git clone "$repo_url" temp_dir
+    # Check if the repository already exists
+    if [ ! -d "SubPanel2" ]; then
+        git clone "$repo_url" SubPanel2
     fi
     
-    # Update files while preserving data
-    cd temp_dir
+    cd SubPanel2
     if [ $? -ne 0 ]; then
         show_error "Failed to enter temp directory"
     fi
     
     # Fetch the latest changes
     git fetch origin
-    git checkout main  # or the appropriate branch
     git pull origin main  # or the appropriate branch
     
     updated_files=()  # Array to keep track of updated files
@@ -60,7 +58,6 @@ update_panel() {
     done
     
     cd ..
-    rm -rf temp_dir
     
     # Check if any files were updated
     if [ ${#updated_files[@]} -eq 0 ]; then
