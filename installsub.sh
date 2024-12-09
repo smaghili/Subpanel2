@@ -63,21 +63,23 @@ reinstall_panel() {
     fi
     
     # Stop services
-    systemctl stop nginx
-    systemctl stop monitor-bot.service
-    systemctl stop v2raycheck.service
+    systemctl stop nginx || true
+    systemctl stop monitor-bot.service || true
+    systemctl stop v2raycheck.service || true
     
-    # Remove SSL certificates
-    certbot delete --cert-name $DOMAIN_NAME --non-interactive
+    # Remove all SSL certificates
+    rm -rf /etc/letsencrypt/live/* || true
+    rm -rf /etc/letsencrypt/archive/* || true
+    rm -rf /etc/letsencrypt/renewal/* || true
     
     # Remove all panel files and directories
-    rm -rf $WEB_ROOT
-    rm -rf $DB_DIR
-    rm -rf $CONFIG_DIR
-    rm -rf $SCRIPTS_DIR
-    rm -rf $SESSIONS_DIR
-    rm -f /etc/nginx/sites-available/$DOMAIN_NAME
-    rm -f /etc/nginx/sites-enabled/$DOMAIN_NAME
+    rm -rf $WEB_ROOT/* || true
+    rm -rf $DB_DIR/* || true
+    rm -rf $CONFIG_DIR/* || true
+    rm -rf $SCRIPTS_DIR/* || true
+    rm -rf $SESSIONS_DIR/* || true
+    rm -f /etc/nginx/sites-available/* || true
+    rm -f /etc/nginx/sites-enabled/* || true
     
     echo "All panel data has been removed. Starting fresh installation..."
     sleep 2
