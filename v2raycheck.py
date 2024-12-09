@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Finland": "🇫🇮",
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
-    "Spain": "🇪🇸",
+    "Spain": "��🇸",
     "Belgium": "🇧🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
@@ -546,184 +546,25 @@ def generate_hamshahri_name(config: str, protocol_type: str, network_type: str, 
     # Generate final name
     return f"Hamshahri-{network_code}-{emoji}-{number}"
     
-async def test_config(config_url: str, port: int, save_path: str, position: str = "end", measure_latency: bool = False, name_suffix: str = None, checkname: bool = False) -> Dict:
-    """
-    Modified to include 'checkname' parameter.
-    """
-    process = None
-    process_curl = None
-    temp_filename = None
-    
+async def test_config(config: str, port: int) -> Dict:
     try:
-        config = config_to_json(config_url, port)
-        if "error" in config:
-            return {"config": config_url, "status": "error", "message": config["error"]}
-    
-        temp_filename = f"config_{port}.json"
-        with open(temp_filename, 'w') as f:
-            json.dump(config, f, indent=2)
-    
-        process = subprocess.Popen(
-            ["/usr/local/bin/xray", "run", "-c", temp_filename],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    
-        await asyncio.sleep(2)
-    
-        try:
-            process_curl = await asyncio.create_subprocess_exec(
-                "curl", "-s", "-x", f"socks5h://localhost:{port}", 
-                "--connect-timeout", "10",
-                "http://ip-api.com/json",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            try:
-                stdout, stderr = await asyncio.wait_for(process_curl.communicate(), timeout=15)
-                if stdout:
-                    output = stdout.decode().strip()
-                    try:
-                        data = json.loads(output)
-                        country = data.get("country", "Unknown")
-                        ip_address = data.get("query", "Unknown")
-                        
-                        if ip_address == "Unknown":
-                            return {
-                                "config": config_url,
-                                "status": "failed",
-                                "message": "Failed to retrieve IP or country",
-                                "port": port
-                            }
-                        
-                        protocol_type = ""
-                        network_type = "tcp"
-                        
-                        if config_url.startswith("vless://"):
-                            protocol_type = "vless"
-                            parsed = urlparse(config_url)
-                            query_params = parse_qs(parsed.query)
-                            network_type = query_params.get('type', ['tcp'])[0]
-                        elif config_url.startswith("vmess://"):
-                            protocol_type = "vmess"
-                            try:
-                                vmess_data = decode_vmess_base64(config_url)
-                                network_type = vmess_data.get('net', 'tcp')
-                            except:
-                                network_type = "tcp"
-                        elif config_url.startswith("trojan://"):
-                            protocol_type = "trojan"
-                            parsed = urlparse(config_url)
-                            query_params = parse_qs(parsed.query)
-                            network_type = query_params.get('type', ['tcp'])[0]
-                        elif config_url.startswith("ss://"):
-                            protocol_type = "shadowsocks"
-                            network_type = "tcp"
-                        
-                        # Extract existing name if present
-                        existing_name = ""
-                        if '#' in config_url:
-                            existing_name = config_url.split('#')[1]
-                        
-                        # Check for 'Hamshahri' in the existing name if checkname is True
-                        if checkname and "Hamshahri" in existing_name:
-                            # Do not rename
-                            modified_config = config_url  # Keep original config without renaming
-                        else:
-                            new_name = generate_hamshahri_name(
-                                config_url, 
-                                protocol_type, 
-                                network_type, 
-                                country
-                            )
-                            
-                            if name_suffix:
-                                new_name = f"{new_name}-{name_suffix}"
-    
-                            
-                            if '#' in config_url:
-                                base_config = config_url.split('#')[0]
-                                modified_config = f"{base_config}#{new_name}"
-                            else:
-                                modified_config = f"{config_url}#{new_name}"
-    
-                        # If config is working and ping measurement is requested
-                        if measure_latency:
-                            try:
-                                async with aiohttp.ClientSession() as session:
-                                    proxy_url = f"socks5://localhost:{port}"
-                                    ping = await measure_ping(session, proxy_url)
-                                    return {
-                                        "config": modified_config,
-                                        "status": "success",
-                                        "ip": ip_address,
-                                        "country": country,
-                                        "port": port,
-                                        "ping": ping if ping != float('inf') else 999999
-                                    }
-                            except:
-                                # If ping measurement fails, return success with high ping
-                                return {
-                                    "config": modified_config,
-                                    "status": "success",
-                                    "ip": ip_address,
-                                    "country": country,
-                                    "port": port,
-                                    "ping": 999999
-                                }
-                        else:
-                            return {
-                                "config": modified_config,
-                                "status": "success",
-                                "ip": ip_address,
-                                "country": country,
-                                "port": port
-                            }
-                    
-                    except (ValueError, KeyError):
-                        return {
-                            "config": config_url,
-                            "status": "failed",
-                            "message": "Invalid JSON response",
-                            "port": port
-                        }
-                else:
-                    return {
-                        "config": config_url,
-                        "status": "failed",
-                        "message": "No response from IP check service",
-                        "port": port
-                    }
-            except asyncio.TimeoutError:
-                return {
-                    "config": config_url,
-                    "status": "failed",
-                    "message": "Connection timeout",
-                    "port": port
-                }
-
-        except Exception as e:
-            return {
-                "config": config_url,
-                "status": "error",
-                "message": str(e),
-                "port": port
-            }
-
-    finally:
-        if process:
-            process.kill()
-        if process_curl:
-            try:
-                process_curl.kill()
-            except:
-                pass
-        if temp_filename and os.path.exists(temp_filename):
-            try:
-                os.remove(temp_filename)
-            except:
-                pass
+        # تبدیل کانفیگ به JSON
+        config_json = config_to_json(config, inbound_port=port)
+        if "error" in config_json:
+            return {"status": "error", "config": config, "error": config_json["error"]}
+        
+        # تست کانفیگ
+        result = await test_xray_config(config_json, port)
+        if result["status"] == "success":
+            # فقط برای کانفیگ‌های موفق JSON را ذخیره می‌کنیم
+            timestamp = int(time.time())
+            json_filename = f"/var/www/config/json_configs/{config_json['outbounds'][0]['protocol']}_{timestamp}.json"
+            os.makedirs(os.path.dirname(json_filename), exist_ok=True)
+            with open(json_filename, 'w') as f:
+                json.dump(config_json, f, indent=2)
+            os.chmod(json_filename, 0o664)
+        
+        return {**result, "config": config}
 
 async def test_config_batch(configs: List[str], start_port: int = 1080, batch_size: int = 40, 
                             save_path: str = "working_configs.txt", position: str = "end",
