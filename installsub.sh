@@ -1,15 +1,124 @@
 #!/bin/bash
 
+# Function to check if panel is already installed
+check_installation() {
+    if [ -f "/etc/nginx/sites-available/$DOMAIN_NAME" ] || [ -d "$WEB_ROOT" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Function to show errors and exit
 show_error() {
     echo -e "\e[31m[ERROR] $1\e[0m"
     exit 1
 }
 
+# Function to update panel
+update_panel() {
+    echo "Updating SubPanel..."
+    
+    # Backup current database and config
+    cp "$DB_PATH" "${DB_PATH}.backup"
+    cp "$CONFIG_FILE_PATH" "${CONFIG_FILE_PATH}.backup"
+    
+    # Clone and update files
+    git clone "$repo_url" temp_dir
+    
+    # Update files while preserving data
+    cd temp_dir
+    for file in *; do
+        if [[ "$file" == *.py ]]; then
+            cp "$file" "$SCRIPTS_DIR/"
+            chmod +x "$SCRIPTS_DIR/$file"
+        elif [ "$file" != "installsub.sh" ]; then
+            cp "$file" "$WEB_ROOT/"
+        fi
+    done
+    cd ..
+    rm -rf temp_dir
+    
+    # Fix permissions
+    sudo chown -R www-data:www-data $WEB_ROOT $SCRIPTS_DIR
+    sudo chmod -R 755 $WEB_ROOT
+    sudo chmod -R 775 $SCRIPTS_DIR
+    
+    # Restart services
+    systemctl restart monitor-bot.service
+    systemctl restart v2raycheck.service
+    systemctl restart nginx
+    systemctl restart $PHP_FPM_SERVICE
+    
+    echo "Update completed successfully!"
+}
+
+# Function to completely reinstall panel
+reinstall_panel() {
+    echo "WARNING: This will delete all data including SSL certificates!"
+    read -p "Are you sure you want to continue? (y/n): " confirm
+    if [ "$confirm" != "y" ]; then
+        echo "Reinstallation cancelled."
+        exit 0
+    fi
+    
+    # Stop services
+    systemctl stop nginx
+    systemctl stop monitor-bot.service
+    systemctl stop v2raycheck.service
+    
+    # Remove SSL certificates
+    certbot delete --cert-name $DOMAIN_NAME --non-interactive
+    
+    # Remove all panel files and directories
+    rm -rf $WEB_ROOT
+    rm -rf $DB_DIR
+    rm -rf $CONFIG_DIR
+    rm -rf $SCRIPTS_DIR
+    rm -rf $SESSIONS_DIR
+    rm -f /etc/nginx/sites-available/$DOMAIN_NAME
+    rm -f /etc/nginx/sites-enabled/$DOMAIN_NAME
+    
+    echo "All panel data has been removed. Starting fresh installation..."
+    sleep 2
+}
+
+LOG_FILE="/var/log/subpanel_install.log"
+exec 1> >(tee -a "$LOG_FILE") 2>&1
+echo "Installation started at $(date)"
+
 read -p "Please enter your domain name (e.g., example.com): " DOMAIN_NAME
 
 if [[ ! $DOMAIN_NAME =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
     show_error "Invalid domain name format\nDomain name should be in format: example.com or sub.example.com"
+fi
+
+# Check if panel is already installed
+if check_installation; then
+    echo "SubPanel is already installed!"
+    echo "Please choose an option:"
+    echo "1) Update panel (preserves all data)"
+    echo "2) Reinstall panel (deletes everything)"
+    echo "3) Exit"
+    
+    read -p "Enter your choice (1-3): " choice
+    
+    case $choice in
+        1)
+            update_panel
+            exit 0
+            ;;
+        2)
+            reinstall_panel
+            ;;
+        3)
+            echo "Exiting..."
+            exit 0
+            ;;
+        *)
+            show_error "Invalid choice"
+            ;;
+    esac
 fi
 
 echo "Using domain: $DOMAIN_NAME"
@@ -41,7 +150,7 @@ fi
 sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx php-fpm php-sqlite3 sqlite3 inotify-tools php-curl python3-pip
 
 # Install Python packages
-pip3 install aiohttp telethon
+pip3 install aiohttp telethon requests python-dotenv
 
 # Install Xray
 if ! command -v xray &> /dev/null; then
@@ -73,6 +182,8 @@ sed -i '
     s/session.gc_probability = .*/session.gc_probability = 1/;
     s/session.gc_divisor = .*/session.gc_divisor = 100/
 ' /etc/php/${PHP_VERSION}/fpm/php.ini
+
+sed -i 's/max_input_time = .*/max_input_time = 300/' /etc/php/${PHP_VERSION}/fpm/php.ini
 
 if [ ! -f "$CONFIG_FILE_PATH" ]; then
     touch "$CONFIG_FILE_PATH"
@@ -148,6 +259,10 @@ CERT_PATH="/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"
 KEY_PATH="/etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem"
 
 # Create and run Telegram session
+if [ ! -f "$SCRIPTS_DIR/telegram-session.py" ]; then
+    show_error "telegram-session.py not found in $SCRIPTS_DIR"
+fi
+
 python3 $SCRIPTS_DIR/telegram-session.py
 
 # Remove default nginx config and create symlink
@@ -185,6 +300,8 @@ for file in *; do
 done
 cd ..
 rm -rf temp_dir
+
+find "$SCRIPTS_DIR" -type f -name "*.py" -exec chmod +x {} \;
 
 sed -i 's/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/' /etc/php/${PHP_VERSION}/fpm/php.ini
 sudo systemctl restart $PHP_FPM_SERVICE
@@ -262,3 +379,60 @@ sudo chmod 644 /var/log/nginx/error.log /var/log/nginx/access.log
 # Restart services
 sudo systemctl restart php${PHP_VERSION}-fpm
 sudo systemctl restart nginx
+
+
+required_files=("v2raycheck.py" "telegram-session.py" "api.php" "check_configs.php" "sub.php" "monitor-bot.py" "index.php" "check_telegram_service.py")
+
+for file in "${required_files[@]}"; do
+    if [[ "$file" == *.py ]]; then
+        if [ ! -f "$SCRIPTS_DIR/$file" ]; then
+            show_error "Required file $file not found in $SCRIPTS_DIR"
+        fi
+    else
+        if [ ! -f "$WEB_ROOT/$file" ]; then
+            show_error "Required file $file not found in $WEB_ROOT"
+        fi
+    fi
+done
+
+# Create systemd service for monitor-bot
+cat << EOF > /etc/systemd/system/monitor-bot.service
+[Unit]
+Description=Telegram Monitor Bot Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=$SCRIPTS_DIR
+ExecStart=/usr/bin/python3 $SCRIPTS_DIR/monitor-bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create systemd service for v2ray checker
+cat << EOF > /etc/systemd/system/v2raycheck.service
+[Unit]
+Description=V2Ray Config Checker Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=$SCRIPTS_DIR
+ExecStart=/usr/bin/python3 $SCRIPTS_DIR/v2raycheck.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start services
+systemctl enable monitor-bot.service
+systemctl enable v2raycheck.service
+systemctl start monitor-bot.service
+systemctl start v2raycheck.service
