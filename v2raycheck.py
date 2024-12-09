@@ -1178,7 +1178,7 @@ async def main():
                     continue
             
             if successful_configs:
-                create_loadbalancer_config(successful_configs, args.lb_output, args.lb_name)
+                create_loadbalancer_config(args.lb_output, args.lb_name)
                 print(f"Load balancer configuration saved to: {args.lb_output}")
             else:
                 print("No valid configs found for load balancer")
@@ -1290,7 +1290,7 @@ async def main():
                         successful_configs.append(config_json)
                 
                 if successful_configs:
-                    create_loadbalancer_config(successful_configs, args.lb_output, args.lb_name)
+                    create_loadbalancer_config(args.lb_output, args.lb_name)
                     print(f"Load balancer configuration saved to: {args.lb_output}")
                 else:
                     print("No working configs found for load balancer!!!!!!")
