@@ -15,6 +15,7 @@ from urllib.parse import urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
 from collections import defaultdict
+from datetime import datetime
 
 COUNTRY_EMOJIS = {
     "Iran": "🇮🇷",
@@ -38,8 +39,8 @@ COUNTRY_EMOJIS = {
     "Finland": "🇫🇮",
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
-    "Spain": "🇪🇸",
-    "Belgium": "���🇪",
+    "Spain": "��🇸",
+    "Belgium": "🇧🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
     "United Arab Emirates": "🇦🇪",
@@ -911,6 +912,12 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
     configs: List of JSON configurations
     """
     try:
+        # اطمینان از وجود دایرکتوری
+        output_dir = os.path.dirname(output_file)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            os.chmod(output_dir, 0o775)
+        
         loadbalancer_config = {
             "remarks": name,
             "log": {
@@ -966,10 +973,11 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
         }
 
         # Process each config
+        valid_configs = 0
         for i, config in enumerate(configs):
             if not config.strip():
                 continue
-
+            
             try:
                 # پردازش همه پروتکل‌ها
                 if config.startswith('vmess://'):
@@ -1114,10 +1122,13 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
 
                 loadbalancer_config["outbounds"].append(outbound)
                 loadbalancer_config["routing"]["balancers"][0]["selector"].append(tag)
-
-            except (json.JSONDecodeError, UnicodeDecodeError, KeyError) as e:
+                valid_configs += 1
+            except Exception as e:
                 print(f"Error processing config {i}: {str(e)}")
                 continue
+        
+        if valid_configs == 0:
+            raise Exception("No valid configs found")
 
         # Add balancer outbound
         loadbalancer_config["routing"]["rules"].append({
@@ -1148,11 +1159,15 @@ def create_loadbalancer_config(configs, output_file="loadbalancer.json", name="L
         # Write the config to file
         with open(output_file, 'w') as f:
             json.dump(loadbalancer_config, f, indent=4)
+        os.chmod(output_file, 0o664)  # اعطای دسترسی مناسب به فایل
 
         return True
 
     except Exception as e:
-        print(f"Error creating load balancer config: {str(e)}")
+        error_msg = f"Error creating load balancer config: {str(e)}"
+        print(error_msg)
+        with open('/var/log/v2ray_errors.log', 'a') as f:
+            f.write(f"{datetime.now()}: {error_msg}\n")
         return False
 
 def get_country_emoji(country_str: str) -> str:

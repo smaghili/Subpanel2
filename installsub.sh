@@ -158,7 +158,7 @@ sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR $SESSIONS_DIR $LOADBALA
 
 # Set permissions for loadbalancer directory
 sudo chown -R www-data:www-data $LOADBALANCER_DIR
-sudo chmod 755 $LOADBALANCER_DIR
+sudo chmod -R 775 $LOADBALANCER_DIR
 
 # Create backup config file
 if [ ! -f "$BACKUP_CONFIG_FILE" ]; then
