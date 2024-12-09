@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Define repository URL
+repo_url="https://github.com/smaghili/SubPanel2.git"
+
 # Function to check if panel is already installed
 check_installation() {
     if [ -f "/etc/nginx/sites-available/$DOMAIN_NAME" ] || [ -d "$WEB_ROOT" ]; then
@@ -22,9 +25,6 @@ update_panel() {
     # Define paths
     WEB_ROOT="/var/www/html"
     SCRIPTS_DIR="/var/www/scripts"
-    
-    # Define repository URL
-    repo_url="https://github.com/smaghili/SubPanel2.git"
     
     # Clone and update files
     git clone "$repo_url" temp_dir
@@ -304,7 +304,6 @@ if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
 fi
 
 # Clone the GitHub repository
-repo_url="https://github.com/smaghili/SubPanel2.git"
 git clone "$repo_url" temp_dir
 
 # Move files to appropriate directories
