@@ -67,10 +67,43 @@ reinstall_panel() {
     systemctl stop monitor-bot.service || true
     systemctl stop v2raycheck.service || true
     
-    # Remove SSL certificates
-    if [ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]; then
-        certbot delete --cert-name $DOMAIN_NAME --non-interactive || true
-    fi
+    # Clean up all nginx configurations
+    rm -f /etc/nginx/sites-enabled/* || true
+    rm -f /etc/nginx/sites-available/* || true
+    
+    # Reset nginx.conf to default
+    cat << EOF > /etc/nginx/nginx.conf
+    user www-data;
+    worker_processes auto;
+    pid /run/nginx.pid;
+    include /etc/nginx/modules-enabled/*.conf;
+    
+    events {
+        worker_connections 768;
+    }
+    
+    http {
+        sendfile on;
+        tcp_nopush on;
+        types_hash_max_size 2048;
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log;
+        gzip on;
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
+    }
+    EOF
+    
+    # Remove SSL certificates for both old and new domains
+    for domain in "ssd.hamshahri2.org" "$DOMAIN_NAME"; do
+        if [ -d "/etc/letsencrypt/live/$domain" ]; then
+            certbot delete --cert-name $domain --non-interactive || true
+        fi
+    done
     
     # Remove all panel files and directories
     rm -rf $WEB_ROOT/* || true
@@ -78,13 +111,14 @@ reinstall_panel() {
     rm -rf $CONFIG_DIR/* || true
     rm -rf $SCRIPTS_DIR/* || true
     rm -rf $SESSIONS_DIR/* || true
-    rm -f /etc/nginx/sites-available/$DOMAIN_NAME || true
-    rm -f /etc/nginx/sites-enabled/$DOMAIN_NAME || true
     
     # Remove systemd services
     rm -f /etc/systemd/system/monitor-bot.service || true
     rm -f /etc/systemd/system/v2raycheck.service || true
     systemctl daemon-reload
+    
+    # Clean PHP sessions
+    rm -rf /var/lib/php/sessions/* || true
     
     echo "All panel data has been removed. Starting fresh installation..."
     sleep 2
