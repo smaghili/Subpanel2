@@ -37,16 +37,29 @@ update_panel() {
     if [ $? -ne 0 ]; then
         show_error "Failed to enter temp directory"
     fi
+    
+    updated_files=()  # Array to keep track of updated files
+    
     for file in *; do
         if [[ "$file" == *.py ]]; then
             cp "$file" "$SCRIPTS_DIR/"
             chmod +x "$SCRIPTS_DIR/$file"
+            updated_files+=("$file")  # Add to updated files
         elif [ "$file" != "installsub.sh" ]; then
             cp "$file" "$WEB_ROOT/"
+            updated_files+=("$file")  # Add to updated files
         fi
     done
     cd ..
     rm -rf temp_dir
+    
+    # Check if any files were updated
+    if [ ${#updated_files[@]} -eq 0 ]; then
+        echo "You are using the latest version."
+    else
+        echo "The following files have been updated:"
+        printf '%s\n' "${updated_files[@]}"
+    fi
     
     # Fix permissions
     sudo chown -R www-data:www-data $WEB_ROOT $SCRIPTS_DIR
