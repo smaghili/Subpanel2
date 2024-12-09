@@ -73,13 +73,15 @@ reinstall_panel() {
     rm -rf /etc/letsencrypt/renewal/* || true
     
     # Remove all panel files and directories
-    rm -rf $WEB_ROOT/* || true
-    rm -rf $DB_DIR/* || true
-    rm -rf $CONFIG_DIR/* || true
-    rm -rf $SCRIPTS_DIR/* || true
-    rm -rf $SESSIONS_DIR/* || true
-    rm -f /etc/nginx/sites-available/* || true
-    rm -f /etc/nginx/sites-enabled/* || true
+    rm -rf $WEB_ROOT || true
+    rm -rf $DB_DIR || true
+    rm -rf $CONFIG_DIR || true
+    rm -rf $SCRIPTS_DIR || true
+    rm -rf $SESSIONS_DIR || true
+    rm -rf /etc/nginx/sites-available || true
+    rm -rf /etc/nginx/sites-enabled || true
+    mkdir -p /etc/nginx/sites-available
+    mkdir -p /etc/nginx/sites-enabled
     
     echo "All panel data has been removed. Starting fresh installation..."
     sleep 2
