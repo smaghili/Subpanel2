@@ -1,13 +1,24 @@
 #!/bin/bash
 
-# Function to check if panel is already installed
-check_installation() {
-    if [ -f "/etc/nginx/sites-available/$DOMAIN_NAME" ] || [ -d "$WEB_ROOT" ]; then
-        return 0
-    else
-        return 1
-    fi
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "\e[31m[ERROR] Please run as root (use sudo)\e[0m"
+    exit 1
+fi
+
+# Function to check and install dependencies
+check_dependencies() {
+    local deps=(nginx certbot python3 php sqlite3 curl)
+    for dep in "${deps[@]}"; do
+        if ! command -v $dep &> /dev/null; then
+            echo "Installing $dep..."
+            apt update && apt install -y $dep
+        fi
+    done
 }
+
+# Check dependencies before installation
+check_dependencies
 
 # Function to show errors and exit
 show_error() {
@@ -126,12 +137,21 @@ reinstall_panel() {
 
 LOG_FILE="/var/log/subpanel_install.log"
 exec 1> >(tee -a "$LOG_FILE") 2>&1
+echo "----------------------------------------"
 echo "Installation started at $(date)"
+echo "System: $(uname -a)"
+echo "----------------------------------------"
 
 # Define paths
 WEB_ROOT="/var/www/html"
 DB_DIR="/var/www/db"
 CONFIG_DIR="/var/www/config"
+SCRIPTS_DIR="/var/www/scripts"
+SESSIONS_DIR="/var/www/sessions"
+LOADBALANCER_DIR="/var/www/html/loadbalancer"
+DB_PATH="${DB_DIR}/subscriptions.db"
+CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
+BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
 
 # First check if panel is already installed
 if [ -d "$WEB_ROOT" ] || [ -d "$DB_DIR" ] || [ -d "$CONFIG_DIR" ]; then
@@ -172,15 +192,6 @@ fi
 echo "Using domain: $DOMAIN_NAME"
 echo "Installation will begin in 3 seconds... Press Ctrl+C to cancel"
 sleep 3
-
-DB_DIR="/var/www/db"
-CONFIG_DIR="/var/www/config"
-DB_PATH="${DB_DIR}/subscriptions.db"
-CONFIG_FILE_PATH="${CONFIG_DIR}/working_configs.txt"
-BACKUP_CONFIG_FILE="${CONFIG_DIR}/backup_config.json"
-SCRIPTS_DIR="/var/www/scripts"
-SESSIONS_DIR="/var/www/sessions"
-LOADBALANCER_DIR="/var/www/html/loadbalancer"
 
 sudo mkdir -p $WEB_ROOT $DB_DIR $CONFIG_DIR $SCRIPTS_DIR $SESSIONS_DIR $LOADBALANCER_DIR
 
@@ -310,7 +321,9 @@ if [ ! -f "$SCRIPTS_DIR/telegram-session.py" ]; then
     show_error "telegram-session.py not found in $SCRIPTS_DIR"
 fi
 
-python3 $SCRIPTS_DIR/telegram-session.py
+if ! python3 $SCRIPTS_DIR/telegram-session.py; then
+    show_error "Failed to create Telegram session"
+fi
 
 # Remove default nginx config and create symlink
 rm -f /etc/nginx/sites-enabled/default
@@ -484,7 +497,17 @@ WantedBy=multi-user.target
 EOF
 
 # Enable and start services
-systemctl enable monitor-bot.service
-systemctl enable v2raycheck.service
-systemctl start monitor-bot.service
-systemctl start v2raycheck.service
+systemctl enable monitor-bot.service || show_error "Failed to enable monitor-bot service"
+systemctl enable v2raycheck.service || show_error "Failed to enable v2raycheck service"
+systemctl start monitor-bot.service || show_error "Failed to start monitor-bot service"
+systemctl start v2raycheck.service || show_error "Failed to start v2raycheck service"
+
+# Cleanup function
+cleanup() {
+    echo "Cleaning up..."
+    rm -rf temp_dir
+    systemctl restart nginx
+}
+
+# Set trap for cleanup
+trap cleanup EXIT
