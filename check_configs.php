@@ -661,7 +661,6 @@ if (isset($_POST['check_interval'])) {
                 <input type="url" name="subscription_url" placeholder="Subscription URL" required style="margin-bottom: 10px;">
             </div>
             <div class="form-group">
-                <label for="bot_id">Bot ID:</label>
                 <input type="text" class="form-control" id="bot_id" name="bot_id" placeholder="Bot ID (Optional)" style="margin-bottom: 10px;">
             </div>
             <button type="submit">Check Configs</button>
@@ -694,7 +693,7 @@ if (isset($_POST['check_interval'])) {
                     $usage = $db->querySingle("SELECT * FROM usage_data WHERE config_id = {$row['id']} ORDER BY check_date DESC LIMIT 1", true);
                     $first_check = $db->querySingle("SELECT check_date FROM config_checks WHERE url = '" . SQLite3::escapeString($row['url']) . "' ORDER BY check_date ASC LIMIT 1");
                     
-                    if ($usage) {
+                    if (!empty($row['bot_id']) && $usage) {
                         // محاسبه درصد روزهای باقیمانده
                         $start_date = new DateTime($first_check);
                         $current_date = new DateTime();
@@ -758,6 +757,40 @@ if (isset($_POST['check_interval'])) {
                         </td>
                     </tr>
                     <?php
+                    } else {
+                        // نمایش فقط اطلاعات کانفیگ بدون اطلاعات مصرف
+                        ?>
+                        <tr>
+                            <td><a href="<?= htmlspecialchars($row['url']) ?>" target="_blank"><?= htmlspecialchars($row['name']) ?></a></td>
+                            <td style="text-align: center; direction: rtl;">
+                                <?php
+                                    $valid = en2fa($row['valid_configs']);
+                                    $total = en2fa($row['total_configs']);
+                                    echo "{$valid} از {$total}";
+                                ?>
+                            </td>
+                            <td style="text-align: center; direction: rtl;">
+                                <?php 
+                                    $timestamp = strtotime($row['check_date']);
+                                    $tehran_timestamp = $timestamp + (3.5 * 3600);
+                                    echo en2fa(jdate("Y/m/d H:i", $tehran_timestamp));
+                                ?>
+                            </td>
+                            <td>-</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <form method="POST" style="display: inline;" onsubmit="return confirm('آیا از حذف این مورد اطمینان دارید؟');">
+                                        <input type="hidden" name="delete_id" value="<?= $row['id'] ?>">
+                                        <button type="submit" class="delete-btn">حذف</button>
+                                    </form>
+                                    <form method="POST" style="display: inline;" onsubmit="showLoading()">
+                                        <input type="hidden" name="url" value="<?= htmlspecialchars($row['url']) ?>">
+                                        <button type="submit" name="recheck" class="recheck-btn">بررسی مجدد</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php
                     }
                 ?>
                 <?php endwhile; ?>
