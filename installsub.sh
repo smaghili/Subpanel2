@@ -46,10 +46,13 @@ update_panel() {
             chmod +x "$SCRIPTS_DIR/$file"
             updated_files+=("$file")  # Add to updated files
         elif [ "$file" != "installsub.sh" ]; then
-            cp "$file" "$WEB_ROOT/"
-            updated_files+=("$file")  # Add to updated files
+            if ! git diff --quiet HEAD -- "$file"; then
+                cp "$file" "$WEB_ROOT/"
+                updated_files+=("$file")  # Add to updated files
+            fi
         fi
     done
+    
     cd ..
     rm -rf temp_dir
     
