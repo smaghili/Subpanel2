@@ -48,7 +48,11 @@ function update_user_configs($db, $user_id, $config_limit) {
         error_log("Loadbalancer content: " . $loadbalancer_content);
         if ($loadbalancer_content && ($json = json_decode($loadbalancer_content, true)) !== null) {
             if (isset($json['inbounds']) && isset($json['outbounds']) && isset($json['routing'])) {
-                $loadbalancer_encoded = base64_encode($loadbalancer_content);
+                $stmt = $db->prepare('UPDATE users SET subscription_link = :link, loadbalancer_config = :lb_config WHERE id = :id');
+                $stmt->bindValue(':link', $encoded_config, SQLITE3_TEXT);
+                $stmt->bindValue(':lb_config', $loadbalancer_content, SQLITE3_TEXT);
+                $stmt->bindValue(':id', $user_id, SQLITE3_INTEGER);
+                return $stmt->execute();
             } else {
                 error_log("Invalid loadbalancer structure: " . print_r($json, true));
                 throw new Exception('Invalid loadbalancer config structure');
@@ -133,58 +137,66 @@ try {
     
     // Get fresh configs
     if ($is_loadbalancer) {
-        $stmt = $db->prepare('SELECT loadbalancer_link as subscription_link FROM users WHERE id = :id');
+        $stmt = $db->prepare('SELECT loadbalancer_config as subscription_link FROM users WHERE id = :id');
+        $stmt->bindValue(':id', $result['id'], SQLITE3_INTEGER);
+        $fresh_result = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
+        
+        // For loadbalancer, return the JSON directly
+        header('Content-Type: application/json');
+        echo $fresh_result['subscription_link'];
+        exit;
     } else {
         $stmt = $db->prepare('SELECT subscription_link FROM users WHERE id = :id');
-    }
-    $stmt->bindValue(':id', $result['id'], SQLITE3_INTEGER);
-    $fresh_result = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
-    $configs = base64_decode($fresh_result['subscription_link']);
+        $stmt->bindValue(':id', $result['id'], SQLITE3_INTEGER);
+        $fresh_result = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
+        $configs = base64_decode($fresh_result['subscription_link']);
+        
+        // Continue with the normal subscription process...
+        function createTitleConfig($title) {
+            $uuid = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+                mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+                mt_rand(0, 0xffff),
+                mt_rand(0, 0x0fff) | 0x4000,
+                mt_rand(0, 0x3fff) | 0x8000,
+                mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+            );
 
-    function createTitleConfig($title) {
-        $uuid = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-        );
+            $vmessConfig = [
+                "v" => "2",
+                "ps" => $title,
+                "add" => "127.0.0.1",
+                "port" => "1080",
+                "id" => $uuid,
+                "aid" => "0",
+                "net" => "tcp",
+                "type" => "none",
+                "host" => "",
+                "path" => "",
+                "tls" => "",
+                "sni" => "",
+                "scy" => "auto"
+            ];
 
-        $vmessConfig = [
-            "v" => "2",
-            "ps" => $title,
-            "add" => "127.0.0.1",
-            "port" => "1080",
-            "id" => $uuid,
-            "aid" => "0",
-            "net" => "tcp",
-            "type" => "none",
-            "host" => "",
-            "path" => "",
-            "tls" => "",
-            "sni" => "",
-            "scy" => "auto"
-        ];
-
-        return 'vmess://' . base64_encode(json_encode($vmessConfig));
+            return 'vmess://' . base64_encode(json_encode($vmessConfig));
+        }
+        
+        $configFile = '/var/www/config/working_configs.txt';
+        $lastUpdateTime = date('Y-m-d H:i', filemtime($configFile));
+        
+        $titleText = "🔄 Update: {$lastUpdateTime} | 👤 {$result['name']} | ⏳ Days: {$daysRemaining}";
+        if ($is_loadbalancer) {
+            $titleText = "⚖️ LoadBalancer | " . $titleText;
+        }
+        $titleConfig = createTitleConfig($titleText);
+        
+        $allConfigs = $titleConfig . "\n" . $configs;
+        
+        header('Profile-Title: ' . $result['name']);
+        header('Subscription-UserInfo: upload=0; download=0; total=0; expire=' . $expiration_timestamp);
+        header('Content-Type: text/plain');
+        
+        echo $allConfigs;
     }
-    
-    $configFile = '/var/www/config/working_configs.txt';
-    $lastUpdateTime = date('Y-m-d H:i', filemtime($configFile));
-    
-    $titleText = "🔄 Update: {$lastUpdateTime} | 👤 {$result['name']} | ⏳ Days: {$daysRemaining}";
-    if ($is_loadbalancer) {
-        $titleText = "⚖️ LoadBalancer | " . $titleText;
-    }
-    $titleConfig = createTitleConfig($titleText);
-    
-    $allConfigs = $titleConfig . "\n" . $configs;
-    
-    header('Profile-Title: ' . $result['name']);
-    header('Subscription-UserInfo: upload=0; download=0; total=0; expire=' . $expiration_timestamp);
-    header('Content-Type: text/plain');
-    
-    echo $allConfigs;
     
 } catch (Exception $e) {
     error_log("Error in sub.php: " . $e->getMessage());

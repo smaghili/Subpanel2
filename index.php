@@ -186,36 +186,20 @@ elseif (isset($_POST['edit_id'])) {
                 }
 
                 // Create loadbalancer config using v2raycheck.py
-                $loadbalancer_output_file = tempnam(sys_get_temp_dir(), 'lb_');
-                if ($loadbalancer_output_file === false) {
-                    throw new Exception('Failed to create loadbalancer output file');
-                }
-
                 $command = "python3 /var/www/scripts/v2raycheck.py -file " . escapeshellarg($temp_config_file) . 
                           " -loadbalancer -nocheck -count " . escapeshellarg($config_limit) .
-                          " -lb-output " . escapeshellarg($loadbalancer_output_file) . " 2>&1";
+                          " -lb-output php://stdout 2>/dev/null";  // Output to stdout instead of file
                 
-                exec($command, $output, $return_var);
-
-                // Read the loadbalancer config
-                if ($return_var !== 0) {
-                    throw new Exception('Failed to create loadbalancer config: ' . implode("\n", $output));
+                $loadbalancer_content = shell_exec($command);
+                
+                if (!$loadbalancer_content) {
+                    throw new Exception('Failed to create loadbalancer config');
                 }
 
-                if (!file_exists($loadbalancer_output_file)) {
-                    throw new Exception('Loadbalancer output file not created');
-                }
-
-                $loadbalancer_content = file_get_contents($loadbalancer_output_file);
-                if ($loadbalancer_content === false) {
-                    throw new Exception('Failed to read loadbalancer config');
-                }
+                // Clean up temporary file
+                @unlink($temp_config_file);
 
                 $loadbalancer_encoded = base64_encode($loadbalancer_content);
-
-                // Clean up temporary files
-                @unlink($temp_config_file);
-                @unlink($loadbalancer_output_file);
 
                 $access_token = bin2hex(random_bytes(16));
                 $loadbalancer_token = bin2hex(random_bytes(16));
@@ -226,18 +210,15 @@ elseif (isset($_POST['edit_id'])) {
                     $activated_at = date('Y-m-d H:i:s');
                 }
 
-                $stmt = $db->prepare('INSERT INTO users (name, subscription_link, loadbalancer_link, access_token, loadbalancer_token, config_limit, activated_at, duration) VALUES (:name, :link, :lb_link, :token, :lb_token, :limit, :activated_at, :duration)');
+                // Store configs and loadbalancer config in database
+                $stmt = $db->prepare('INSERT INTO users (name, subscription_link, loadbalancer_config, access_token, loadbalancer_token, config_limit, activated_at, duration) VALUES (:name, :link, :lb_config, :token, :lb_token, :limit, :activated_at, :duration)');
                 $stmt->bindValue(':name', $name, SQLITE3_TEXT);
                 $stmt->bindValue(':link', $encoded_config, SQLITE3_TEXT);
-                $stmt->bindValue(':lb_link', $loadbalancer_encoded, SQLITE3_TEXT);
+                $stmt->bindValue(':lb_config', $loadbalancer_content, SQLITE3_TEXT);
                 $stmt->bindValue(':token', $access_token, SQLITE3_TEXT);
                 $stmt->bindValue(':lb_token', $loadbalancer_token, SQLITE3_TEXT);
                 $stmt->bindValue(':limit', $config_limit, SQLITE3_INTEGER);
-                if ($activated_at) {
-                    $stmt->bindValue(':activated_at', $activated_at, SQLITE3_TEXT);
-                } else {
-                    $stmt->bindValue(':activated_at', null, SQLITE3_NULL);
-                }
+                $stmt->bindValue(':activated_at', $activated_at, $activated_at ? SQLITE3_TEXT : SQLITE3_NULL);
                 $stmt->bindValue(':duration', $days, SQLITE3_INTEGER);
 
                 if ($stmt->execute()) {
