@@ -1060,10 +1060,22 @@ def create_loadbalancer_config(config_urls: List[str], output_file="loadbalancer
             if "error" in config_json:
                 print(f"Error processing config at index {index + 1}: {config_json['error']}")
                 continue
+            
             # Extract outbound from config
-            outbound = config_json.get("outbounds", [{}])[0]
-            # Set tag for each outbound
-            outbound["tag"] = f"proxy-{index + 1}"
+            original_outbound = config_json.get("outbounds", [{}])[0]
+            
+            # Create new outbound with ordered fields
+            outbound = {
+                "tag": f"proxy-{index + 1}",  # Place tag first
+                "protocol": original_outbound.get("protocol", ""),
+                "settings": original_outbound.get("settings", {}),
+                "streamSettings": original_outbound.get("streamSettings", {})
+            }
+            
+            # Add optional fields if they exist
+            if "mux" in original_outbound:
+                outbound["mux"] = original_outbound["mux"]
+            
             # Add outbound to load balancer
             loadbalancer_config["outbounds"].append(outbound)
         except Exception as e:
@@ -1077,8 +1089,8 @@ def create_loadbalancer_config(config_urls: List[str], output_file="loadbalancer
 
     # Add freedom outbound (if needed)
     loadbalancer_config["outbounds"].append({
-        "protocol": "freedom",
-        "tag": "direct-out"
+        "tag": "direct-out",
+        "protocol": "freedom"
     })
 
     # Save load balancer file
