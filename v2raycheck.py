@@ -950,160 +950,142 @@ def priority_key(config: str) -> int:
     else:
         return 3
 
-def create_loadbalancer_config(output_file="loadbalancer.json", name="Xray-Load-Balancer (Surfboardv2ray)"):
-    """
-    Create a load balancer config from multiple working configs
-    """
-    try:
-        loadbalancer_config = {
-            "remarks": name,
-            "log": {
-                "access": "",
-                "error": "",
-                "loglevel": "warning"
+def create_loadbalancer_config(config_urls: List[str], output_file="loadbalancer.json", name="Xray-Load-Balancer (Surfboardv2ray)"):
+    loadbalancer_config = {
+        "remarks": name,
+        "log": {
+            "access": "",
+            "error": "",
+            "loglevel": "warning"
+        },
+        "inbounds": [
+            {
+                "tag": "socks",
+                "port": 10808,
+                "listen": "0.0.0.0",
+                "protocol": "socks",
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls"],
+                    "routeOnly": False
+                },
+                "settings": {
+                    "auth": "noauth",
+                    "udp": True,
+                    "allowTransparent": False
+                }
             },
-            "inbounds": [
-                {
-                    "tag": "socks",
-                    "port": 10808,
-                    "listen": "0.0.0.0",
-                    "protocol": "socks",
-                    "sniffing": {
-                        "enabled": True,
-                        "destOverride": ["http", "tls"],
-                        "routeOnly": False
-                    },
-                    "settings": {
-                        "auth": "noauth",
-                        "udp": True,
-                        "allowTransparent": False
-                    }
+            {
+                "tag": "http",
+                "port": 10809,
+                "listen": "0.0.0.0",
+                "protocol": "http",
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls"],
+                    "routeOnly": False
                 },
+                "settings": {
+                    "auth": "noauth",
+                    "udp": True,
+                    "allowTransparent": False
+                }
+            },
+            {
+                "tag": "api",
+                "port": 10813,
+                "listen": "127.0.0.1",
+                "protocol": "dokodemo-door",
+                "settings": {
+                    "udp": False,
+                    "address": "127.0.0.1",
+                    "allowTransparent": False
+                }
+            }
+        ],
+        "outbounds": [],
+        "stats": {},
+        "api": {
+            "tag": "api",
+            "services": ["StatsService"]
+        },
+        "policy": {
+            "system": {
+                "statsOutboundUplink": True,
+                "statsOutboundDownlink": True
+            }
+        },
+        "burstObservatory": {
+            "pingConfig": {
+                "connectivity": "http://connectivitycheck.platform.hicloud.com/generate_204",
+                "destination": "http://www.google.com/gen_204",
+                "interval": "15m",
+                "sampling": 10,
+                "timeout": "3s"
+            },
+            "subjectSelector": [],  # Will be filled dynamically
+        },
+        "dns": {
+            "hosts": {
+                "domain:googleapis.cn": "googleapis.com"
+            },
+            "servers": ["1.1.1.1"]
+        },
+        "routing": {
+            "balancers": [
                 {
-                    "tag": "http",
-                    "port": 10809,
-                    "listen": "0.0.0.0",
-                    "protocol": "http",
-                    "sniffing": {
-                        "enabled": True,
-                        "destOverride": ["http", "tls"],
-                        "routeOnly": False
+                    "selector": [],  # Will be filled dynamically
+                    "strategy": {
+                        "type": "leastLoad"
                     },
-                    "settings": {
-                        "auth": "noauth",
-                        "udp": True,
-                        "allowTransparent": False
-                    }
-                },
-                {
-                    "tag": "api",
-                    "port": 10813,
-                    "listen": "127.0.0.1",
-                    "protocol": "dokodemo-door",
-                    "settings": {
-                        "udp": False,
-                        "address": "127.0.0.1",
-                        "allowTransparent": False
-                    }
+                    "tag": "xray-load-balancer"
                 }
             ],
-            "outbounds": [],
-            "stats": {},
-            "api": {
-                "tag": "api",
-                "services": ["StatsService"]
-            },
-            "policy": {
-                "system": {
-                    "statsOutboundUplink": True,
-                    "statsOutboundDownlink": True
+            "domainMatcher": "hybrid",
+            "domainStrategy": "IPIfNonMatch",
+            "rules": [
+                {
+                    "balancerTag": "xray-load-balancer",
+                    "inboundTag": ["socks", "http"],
+                    "type": "field"
                 }
-            },
-            "burstObservatory": {
-                "pingConfig": {
-                    "connectivity": "http://connectivitycheck.platform.hicloud.com/generate_204",
-                    "destination": "http://www.google.com/gen_204",
-                    "interval": "15m",
-                    "sampling": 10,
-                    "timeout": "3s"
-                },
-                "subjectSelector": [],  # Will be filled dynamically
-            },
-            "dns": {
-                "hosts": {
-                    "domain:googleapis.cn": "googleapis.com"
-                },
-                "servers": ["1.1.1.1"]
-            },
-            "routing": {
-                "balancers": [
-                    {
-                        "selector": [],  # Will be filled dynamically
-                        "strategy": {
-                            "type": "leastLoad"
-                        },
-                        "tag": "xray-load-balancer"
-                    }
-                ],
-                "domainMatcher": "hybrid",
-                "domainStrategy": "IPIfNonMatch",
-                "rules": [
-                    {
-                        "balancerTag": "xray-load-balancer",
-                        "inboundTag": ["socks", "http"],
-                        "type": "field"
-                    }
-                ]
-            }
+            ]
         }
+    }
 
-        # Read existing configs from the specified directory
-        config_directory = "/var/www/config/json_configs"
-        if not os.path.exists(config_directory):
-            print(f"Error: Directory {config_directory} does not exist")
-            return False
-            
-        config_files = [f for f in os.listdir(config_directory) if f.endswith('.json')]
-        
-        for config_file in config_files:
-            try:
-                with open(os.path.join(config_directory, config_file), 'r') as f:
-                    config_data = json.load(f)
-                    
-                    # Extract outbounds from the config file
-                    if "outbounds" in config_data:
-                        for outbound in config_data["outbounds"]:
-                            # Only add outbound if it has a tag and is not "direct" or "block"
-                            if "tag" in outbound and outbound["tag"] not in ["direct", "block"]:
-                                # Keep the original tag to maintain uniqueness
-                                loadbalancer_config["outbounds"].append(outbound)
-                    else:
-                        print(f"Warning: No outbounds found in {config_file}")
-                        
-            except json.JSONDecodeError:
-                print(f"Error: Invalid JSON in file {config_file}")
-            except Exception as e:
-                print(f"Error processing file {config_file}: {str(e)}")
+    for index, config_url in enumerate(config_urls):
+        try:
+            # Convert config to JSON
+            config_json = config_to_json(config_url)
+            if "error" in config_json:
+                print(f"Error processing config at index {index + 1}: {config_json['error']}")
+                continue
+            # Extract outbound from config
+            outbound = config_json.get("outbounds", [{}])[0]
+            # Set tag for each outbound
+            outbound["tag"] = f"proxy-{index + 1}"
+            # Add outbound to load balancer
+            loadbalancer_config["outbounds"].append(outbound)
+        except Exception as e:
+            print(f"Error processing config at index {index + 1}: {str(e)}")
+            continue
 
-        # Update subjectSelector and selector based on the number of outbounds
-        loadbalancer_config["burstObservatory"]["subjectSelector"] = [f"proxy-{i + 1}" for i in range(len(loadbalancer_config["outbounds"]))]
-        loadbalancer_config["routing"]["balancers"][0]["selector"] = [f"proxy-{i + 1}" for i in range(len(loadbalancer_config["outbounds"]))]
+    # Update load balancer settings
+    total_proxies = len(loadbalancer_config["outbounds"])
+    loadbalancer_config["burstObservatory"]["subjectSelector"] = [f"proxy-{i + 1}" for i in range(total_proxies)]
+    loadbalancer_config["routing"]["balancers"][0]["selector"] = [f"proxy-{i + 1}" for i in range(total_proxies)]
 
-        # Add the freedom outbound
-        loadbalancer_config["outbounds"].append({
-            "protocol": "freedom",
-            "tag": "direct-out"
-        })
+    # Add freedom outbound (if needed)
+    loadbalancer_config["outbounds"].append({
+        "protocol": "freedom",
+        "tag": "direct-out"
+    })
 
-        # Write the config to file
-        with open(output_file, 'w') as f:
-            json.dump(loadbalancer_config, f, indent=4)
+    # Save load balancer file
+    with open(output_file, 'w') as f:
+        json.dump(loadbalancer_config, f, indent=4)
 
-        return True
-
-    except Exception as e:
-        print(f"Error creating load balancer config: {str(e)}")
-        return False
+    print(f"Load balancer configuration saved to: {output_file}")
 
 def get_country_emoji(country_str: str) -> str:
     """Get country emoji from country string, handling special cases"""
@@ -1178,21 +1160,14 @@ async def main():
         # If -nocheck is used with -loadbalancer, skip testing and create loadbalancer directly
         if args.loadbalancer and args.nocheck:
             print("\nCreating load balancer configuration without testing configs...")
-            successful_configs = []
-            for config in configs:
-                try:
-                    config_json = config_to_json(config)
-                    if "error" not in config_json:
-                        successful_configs.append(config_json)
-                except Exception as e:
-                    print(f"Error processing config: {str(e)}")
-                    continue
-            
-            if successful_configs:
-                create_loadbalancer_config(args.lb_output, args.lb_name)
-                print(f"Load balancer configuration saved to: {args.lb_output}")
-            else:
-                print("No valid configs found for load balancer")
+            # خواندن کانفیگ‌ها از فایل مشخص شده
+            configs = read_configs_from_file(args.file)
+            if not configs:
+                print("No valid configs found in the specified file!")
+                return
+            # ساختن لود بالانسر با استفاده از کانفیگ‌ها
+            create_loadbalancer_config(configs, args.lb_output, args.lb_name)
+            print(f"Load balancer configuration saved to: {args.lb_output}")
             return
 
         tcp_only = args.nontcp
