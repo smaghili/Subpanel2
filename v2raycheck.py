@@ -1172,12 +1172,19 @@ async def main():
         # If -nocheck is used with -loadbalancer, skip testing and create loadbalancer directly
         if args.loadbalancer and args.nocheck:
             print("\nCreating load balancer configuration without testing configs...")
-            # خواندن کانفیگ‌ها از فایل مشخص شده
+            # Read configs from specified file
             configs = read_configs_from_file(args.file)
             if not configs:
                 print("No valid configs found in the specified file!")
                 return
-            # ساختن لود بالانسر با استفاده از کانفیگ‌ها
+
+            # Limit number of configs if count is specified
+            if args.count and args.count > 0:
+                original_count = len(configs)
+                configs = configs[:args.count]
+                print(f"\nLimiting configs to first {len(configs)} of {original_count} configs")
+
+            # Create load balancer using limited configs
             create_loadbalancer_config(configs, args.lb_output, args.lb_name)
             print(f"Load balancer configuration saved to: {args.lb_output}")
             return
