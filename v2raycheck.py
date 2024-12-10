@@ -1059,20 +1059,31 @@ def create_loadbalancer_config(output_file="loadbalancer.json", name="Xray-Load-
 
         # Read existing configs from the specified directory
         config_directory = "/var/www/config/json_configs"
+        if not os.path.exists(config_directory):
+            print(f"Error: Directory {config_directory} does not exist")
+            return False
+            
         config_files = [f for f in os.listdir(config_directory) if f.endswith('.json')]
         
-        for index, config_file in enumerate(config_files):
-            with open(os.path.join(config_directory, config_file), 'r') as f:
-                config_data = json.load(f)
-                # Add the existing outbound config to the load balancer config
-                outbound = {
-                    "tag": f"proxy-{index + 1}",
-                    "protocol": config_data.get("protocol", "vless"),  # Default to "vless" if not specified
-                    "settings": config_data.get("settings", {}),
-                    "streamSettings": config_data.get("streamSettings", {}),
-                    "mux": config_data.get("mux", {"enabled": False, "concurrency": -1})  # Default mux settings
-                }
-                loadbalancer_config["outbounds"].append(outbound)
+        for config_file in config_files:
+            try:
+                with open(os.path.join(config_directory, config_file), 'r') as f:
+                    config_data = json.load(f)
+                    
+                    # Extract outbounds from the config file
+                    if "outbounds" in config_data:
+                        for outbound in config_data["outbounds"]:
+                            # Only add outbound if it has a tag and is not "direct" or "block"
+                            if "tag" in outbound and outbound["tag"] not in ["direct", "block"]:
+                                # Keep the original tag to maintain uniqueness
+                                loadbalancer_config["outbounds"].append(outbound)
+                    else:
+                        print(f"Warning: No outbounds found in {config_file}")
+                        
+            except json.JSONDecodeError:
+                print(f"Error: Invalid JSON in file {config_file}")
+            except Exception as e:
+                print(f"Error processing file {config_file}: {str(e)}")
 
         # Update subjectSelector and selector based on the number of outbounds
         loadbalancer_config["burstObservatory"]["subjectSelector"] = [f"proxy-{i + 1}" for i in range(len(loadbalancer_config["outbounds"]))]
