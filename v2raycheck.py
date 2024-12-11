@@ -39,7 +39,7 @@ COUNTRY_EMOJIS = {
     "Denmark": "🇩🇰",
     "Italy": "🇮🇹",
     "Spain": "🇪🇸",
-    "Belgium": "🇧🇪",
+    "Belgium": "���🇪",
     "Latvia": "🇱🇻",
     "Poland": "🇵🇱",
     "United Arab Emirates": "🇦🇪",
@@ -1063,49 +1063,134 @@ def create_loadbalancer_config(config_urls: List[str], output_file="loadbalancer
                 print(f"Error processing config at index {index + 1}: {config_json['error']}")
                 continue
 
+            original_outbound = config_json["outbounds"][0]
+            protocol = original_outbound["protocol"]
+            network_type = original_outbound["streamSettings"]["network"]
+            security = original_outbound["streamSettings"].get("security", "none")
+
             outbound = {
                 "tag": f"proxy-{index + 1}",
-                "protocol": config_json["outbounds"][0]["protocol"],
-                "settings": {
-                    "vnext": [{
-                        "address": config_json["outbounds"][0]["settings"]["vnext"][0]["address"],
-                        "port": config_json["outbounds"][0]["settings"]["vnext"][0]["port"],
-                        "users": [{
-                            "id": config_json["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"],
-                            "alterId": 0,
-                            "email": "t@t.tt",
-                            "security": "auto",
-                            "encryption": "none",
-                            "flow": config_json["outbounds"][0]["settings"]["vnext"][0]["users"][0].get("flow", "")
-                        }]
-                    }]
-                },
+                "protocol": protocol,
                 "streamSettings": {
-                    "network": "tcp",
-                    "tcpSettings": {
-                        "header": {
-                            "type": "http",
-                            "request": {
-                                "version": "1.1",
-                                "method": "GET",
-                                "path": ["/"],
-                                "headers": {
-                                    "Host": [config_json["outbounds"][0]["streamSettings"].get("tcpSettings", {}).get("header", {}).get("request", {}).get("headers", {}).get("Host", [""])[0]],
-                                    "User-Agent": [""],
-                                    "Accept-Encoding": ["gzip, deflate"],
-                                    "Connection": ["keep-alive"],
-                                    "Pragma": "no-cache"
-                                }
-                            }
-                        }
-                    }
+                    "network": network_type,
+                    "security": security,
                 },
                 "mux": {
                     "enabled": False,
                     "concurrency": -1
                 }
             }
-            
+
+            # Handle different protocols
+            if protocol == "vless":
+                outbound["settings"] = {
+                    "vnext": [{
+                        "address": original_outbound["settings"]["vnext"][0]["address"],
+                        "port": original_outbound["settings"]["vnext"][0]["port"],
+                        "users": [{
+                            "id": original_outbound["settings"]["vnext"][0]["users"][0]["id"],
+                            "alterId": 0,
+                            "email": "t@t.tt",
+                            "security": "auto",
+                            "encryption": "none",
+                            "flow": original_outbound["settings"]["vnext"][0]["users"][0].get("flow", "")
+                        }]
+                    }]
+                }
+            elif protocol == "vmess":
+                outbound["settings"] = {
+                    "vnext": [{
+                        "address": original_outbound["settings"]["vnext"][0]["address"],
+                        "port": original_outbound["settings"]["vnext"][0]["port"],
+                        "users": [{
+                            "id": original_outbound["settings"]["vnext"][0]["users"][0]["id"],
+                            "alterId": original_outbound["settings"]["vnext"][0]["users"][0].get("alterId", 0),
+                            "security": "auto"
+                        }]
+                    }]
+                }
+            elif protocol == "trojan":
+                outbound["settings"] = {
+                    "servers": [{
+                        "address": original_outbound["settings"]["servers"][0]["address"],
+                        "port": original_outbound["settings"]["servers"][0]["port"],
+                        "password": original_outbound["settings"]["servers"][0]["password"]
+                    }]
+                }
+            elif protocol == "shadowsocks":
+                outbound["settings"] = {
+                    "servers": [{
+                        "address": original_outbound["settings"]["servers"][0]["address"],
+                        "port": original_outbound["settings"]["servers"][0]["port"],
+                        "method": original_outbound["settings"]["servers"][0]["method"],
+                        "password": original_outbound["settings"]["servers"][0]["password"]
+                    }]
+                }
+
+            # Handle security settings (TLS/Reality)
+            if security == "tls":
+                tls_settings = original_outbound["streamSettings"].get("tlsSettings", {})
+                outbound["streamSettings"]["tlsSettings"] = {
+                    "serverName": tls_settings.get("serverName", ""),
+                    "allowInsecure": tls_settings.get("allowInsecure", False),
+                    "fingerprint": tls_settings.get("fingerprint", "chrome"),
+                    "alpn": tls_settings.get("alpn", ["h2", "http/1.1"]),
+                }
+            elif security == "reality":
+                reality_settings = original_outbound["streamSettings"].get("realitySettings", {})
+                outbound["streamSettings"]["realitySettings"] = {
+                    "show": reality_settings.get("show", False),
+                    "fingerprint": reality_settings.get("fingerprint", "chrome"),
+                    "serverName": reality_settings.get("serverName", ""),
+                    "publicKey": reality_settings.get("publicKey", ""),
+                    "shortId": reality_settings.get("shortId", ""),
+                    "spiderX": reality_settings.get("spiderX", "")
+                }
+
+            # Handle network types
+            if network_type == "ws":
+                outbound["streamSettings"]["wsSettings"] = {
+                    "path": original_outbound["streamSettings"].get("wsSettings", {}).get("path", "/"),
+                    "headers": {
+                        "Host": original_outbound["streamSettings"].get("wsSettings", {}).get("headers", {}).get("Host", "")
+                    }
+                }
+            elif network_type == "tcp":
+                outbound["streamSettings"]["tcpSettings"] = {
+                    "header": {
+                        "type": "http",
+                        "request": {
+                            "version": "1.1",
+                            "method": "GET",
+                            "path": ["/"],
+                            "headers": {
+                                "Host": [original_outbound["streamSettings"].get("tcpSettings", {}).get("header", {}).get("request", {}).get("headers", {}).get("Host", [""])[0]],
+                                "User-Agent": [""],
+                                "Accept-Encoding": ["gzip, deflate"],
+                                "Connection": ["keep-alive"],
+                                "Pragma": "no-cache"
+                            }
+                        }
+                    }
+                }
+            elif network_type == "grpc":
+                outbound["streamSettings"]["grpcSettings"] = {
+                    "serviceName": original_outbound["streamSettings"].get("grpcSettings", {}).get("serviceName", ""),
+                    "multiMode": original_outbound["streamSettings"].get("grpcSettings", {}).get("multiMode", False)
+                }
+            elif network_type == "http":
+                outbound["streamSettings"]["httpSettings"] = {
+                    "path": original_outbound["streamSettings"].get("httpSettings", {}).get("path", "/"),
+                    "host": original_outbound["streamSettings"].get("httpSettings", {}).get("host", [])
+                }
+            elif network_type == "quic":
+                outbound["streamSettings"]["quicSettings"] = original_outbound["streamSettings"].get("quicSettings", {})
+            elif network_type == "httpupgrade":
+                outbound["streamSettings"]["httpupgradeSettings"] = {
+                    "path": original_outbound["streamSettings"].get("httpupgradeSettings", {}).get("path", "/"),
+                    "host": original_outbound["streamSettings"].get("httpupgradeSettings", {}).get("host", "")
+                }
+
             loadbalancer_config["outbounds"].append(outbound)
         except Exception as e:
             print(f"Error processing config at index {index + 1}: {str(e)}")
