@@ -387,7 +387,10 @@ def config_to_json(config_url: str, inbound_port: int = 1080) -> Dict:
             "port": config.port,
             "users": [{
                 "id": config.uuid,
-                "encryption": config.encryption,
+                "alterId": 0,
+                "email": "t@t.tt",
+                "security": "auto",
+                "encryption": "none",
                 "flow": config.flow if config.flow else ""
             }]
         }]
@@ -1055,47 +1058,74 @@ def create_loadbalancer_config(config_urls: List[str], output_file="loadbalancer
 
     for index, config_url in enumerate(config_urls):
         try:
-            # Convert config to JSON
             config_json = config_to_json(config_url)
             if "error" in config_json:
                 print(f"Error processing config at index {index + 1}: {config_json['error']}")
                 continue
-            
-            # Extract outbound from config
-            original_outbound = config_json.get("outbounds", [{}])[0]
-            
-            # Create new outbound with ordered fields
+
             outbound = {
-                "tag": f"proxy-{index + 1}",  # Place tag first
-                "protocol": original_outbound.get("protocol", ""),
-                "settings": original_outbound.get("settings", {}),
-                "streamSettings": original_outbound.get("streamSettings", {})
+                "tag": f"proxy-{index + 1}",
+                "protocol": config_json["outbounds"][0]["protocol"],
+                "settings": {
+                    "vnext": [{
+                        "address": config_json["outbounds"][0]["settings"]["vnext"][0]["address"],
+                        "port": config_json["outbounds"][0]["settings"]["vnext"][0]["port"],
+                        "users": [{
+                            "id": config_json["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"],
+                            "alterId": 0,
+                            "email": "t@t.tt",
+                            "security": "auto",
+                            "encryption": "none",
+                            "flow": config_json["outbounds"][0]["settings"]["vnext"][0]["users"][0].get("flow", "")
+                        }]
+                    }]
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "tcpSettings": {
+                        "header": {
+                            "type": "http",
+                            "request": {
+                                "version": "1.1",
+                                "method": "GET",
+                                "path": ["/"],
+                                "headers": {
+                                    "Host": [config_json["outbounds"][0]["streamSettings"].get("tcpSettings", {}).get("header", {}).get("request", {}).get("headers", {}).get("Host", [""])[0]],
+                                    "User-Agent": [""],
+                                    "Accept-Encoding": ["gzip, deflate"],
+                                    "Connection": ["keep-alive"],
+                                    "Pragma": "no-cache"
+                                }
+                            }
+                        }
+                    }
+                },
+                "mux": {
+                    "enabled": False,
+                    "concurrency": -1
+                }
             }
             
-            # Add optional fields if they exist
-            if "mux" in original_outbound:
-                outbound["mux"] = original_outbound["mux"]
-            
-            # Add outbound to load balancer
             loadbalancer_config["outbounds"].append(outbound)
         except Exception as e:
             print(f"Error processing config at index {index + 1}: {str(e)}")
             continue
 
-    # Update load balancer settings
+    # Update balancer settings
     total_proxies = len(loadbalancer_config["outbounds"])
-    loadbalancer_config["burstObservatory"]["subjectSelector"] = [f"proxy-{i + 1}" for i in range(total_proxies)]
-    loadbalancer_config["routing"]["balancers"][0]["selector"] = [f"proxy-{i + 1}" for i in range(total_proxies)]
+    proxy_tags = [f"proxy-{i + 1}" for i in range(total_proxies)]
+    
+    loadbalancer_config["burstObservatory"]["subjectSelector"] = proxy_tags
+    loadbalancer_config["routing"]["balancers"][0]["selector"] = proxy_tags
 
-    # Add freedom outbound (if needed)
+    # Add freedom outbound
     loadbalancer_config["outbounds"].append({
         "tag": "direct-out",
         "protocol": "freedom"
     })
 
-    # Save load balancer file
     with open(output_file, 'w') as f:
-        json.dump(loadbalancer_config, f, indent=4)
+        json.dump(loadbalancer_config, f, indent=2)
 
     print(f"Load balancer configuration saved to: {output_file}")
 
